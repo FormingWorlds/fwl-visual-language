@@ -1,0 +1,252 @@
+{
+  "name": "Forming Worlds Lab",
+  "ramps": {
+    "ink": {
+      "hue": 240,
+      "steps": {
+        "0": [
+          1.0,
+          0.0
+        ],
+        "50": [
+          0.972,
+          0.005
+        ],
+        "100": [
+          0.928,
+          0.008
+        ],
+        "200": [
+          0.86,
+          0.01
+        ],
+        "300": [
+          0.76,
+          0.012
+        ],
+        "400": [
+          0.66,
+          0.014
+        ],
+        "500": [
+          0.555,
+          0.016
+        ],
+        "600": [
+          0.43,
+          0.018
+        ],
+        "700": [
+          0.32,
+          0.02
+        ],
+        "800": [
+          0.22,
+          0.022
+        ],
+        "850": [
+          0.17,
+          0.022
+        ],
+        "900": [
+          0.135,
+          0.018
+        ],
+        "950": [
+          0.09,
+          0.012
+        ],
+        "980": [
+          0.055,
+          0.01
+        ]
+      }
+    },
+    "signal": {
+      "hue": 233,
+      "steps": {
+        "300": [
+          0.8,
+          0.09
+        ],
+        "400": [
+          0.7,
+          0.11
+        ],
+        "500": "#0072A1",
+        "600": [
+          0.44,
+          0.115
+        ],
+        "700": [
+          0.34,
+          0.095
+        ]
+      }
+    },
+    "magma": {
+      "hue": null,
+      "steps": {
+        "300": [
+          0.84,
+          0.09,
+          55
+        ],
+        "400": [
+          0.75,
+          0.135,
+          50
+        ],
+        "500": [
+          0.66,
+          0.16,
+          45
+        ],
+        "600": [
+          0.55,
+          0.15,
+          40
+        ],
+        "700": [
+          0.42,
+          0.12,
+          35
+        ]
+      }
+    }
+  },
+  "roles": {
+    "dark": {
+      "background": "ink-950",
+      "surface": "ink-900",
+      "heading": "ink-100",
+      "text": "ink-200",
+      "muted": "ink-400",
+      "line": "ink-700",
+      "axis": "ink-400",
+      "link": "signal-300",
+      "link-hover": "signal-400",
+      "accent": "signal-500",
+      "warm": "magma-500",
+      "warm-text": "magma-300",
+      "note": "signal-400",
+      "warning": "magma-400"
+    },
+    "light": {
+      "background": "ink-50",
+      "surface": "ink-0",
+      "heading": "ink-950",
+      "text": "ink-800",
+      "muted": "ink-500",
+      "line": "ink-200",
+      "axis": "ink-500",
+      "link": "signal-600",
+      "link-hover": "signal-700",
+      "accent": "signal-500",
+      "warm": "magma-600",
+      "warm-text": "magma-700",
+      "note": "signal-500",
+      "warning": "magma-600"
+    },
+    "paper": {
+      "background": "ink-0",
+      "surface": "ink-50",
+      "heading": "ink-950",
+      "text": "ink-800",
+      "muted": "ink-500",
+      "line": "ink-200",
+      "axis": "ink-500",
+      "link": "signal-600",
+      "link-hover": "signal-700",
+      "accent": "signal-500",
+      "warm": "magma-600",
+      "warm-text": "magma-700",
+      "note": "signal-500",
+      "warning": "magma-600"
+    }
+  },
+  "palette": {
+    "names": [
+      "signal",
+      "magma",
+      "fern",
+      "iris",
+      "ochre",
+      "lagoon",
+      "garnet",
+      "ink"
+    ],
+    "light": [
+      "#0172A1",
+      "#B74B21",
+      "#20A976",
+      "#4E2585",
+      "#BC8D03",
+      "#124F54",
+      "#741721",
+      "#6E747A"
+    ],
+    "dark": [
+      "#4DAAD8",
+      "#F1935B",
+      "#6AE7AD",
+      "#7E66C3",
+      "#F3C451",
+      "#4A8289",
+      "#C25656",
+      "#BACAD7"
+    ]
+  },
+  "colormaps": {
+    "default": {
+      "sequential": "batlow",
+      "diverging_light": "vik",
+      "diverging_dark": "berlin"
+    },
+    "ember": [
+      "#03090F",
+      "#023D56",
+      "#0072A1",
+      "#1B9690",
+      "#A89F2E",
+      "#F1935B",
+      "#FFEBD5"
+    ],
+    "tide": [
+      "#023D56",
+      "#0072A1",
+      "#81C8EF",
+      "#F3F6F9",
+      "#F9BB92",
+      "#DF6C32",
+      "#812E19"
+    ],
+    "tide_dark": [
+      "#81C8EF",
+      "#4DAAD8",
+      "#005A7C",
+      "#03090F",
+      "#B74B21",
+      "#F1935B",
+      "#F9BB92"
+    ]
+  },
+  "fonts": {
+    "text": "Geist",
+    "math": "Inter",
+    "mono": "Geist Mono",
+    "fallback_sans": [
+      "Inter",
+      "system-ui",
+      "-apple-system",
+      "BlinkMacSystemFont",
+      "sans-serif"
+    ],
+    "fallback_mono": [
+      "ui-monospace",
+      "SFMono-Regular",
+      "Menlo",
+      "monospace"
+    ]
+  }
+}
