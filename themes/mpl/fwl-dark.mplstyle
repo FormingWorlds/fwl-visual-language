@@ -1,0 +1,86 @@
+## Forming Worlds Lab figure style, dark mode (fwl-visual-language 0.1.0).
+## Generated from the lab tokens; edit tokens/fwl.json, not this file.
+## image.cmap names a Crameri map: import cmcrameri before plotting images.
+
+## Figure: one column of a two-column page; PDF and PS embed TrueType fonts,
+## SVG draws text as paths so it renders without the fonts installed
+figure.figsize: 3.5, 2.6
+figure.dpi: 150
+figure.constrained_layout.use: True
+figure.facecolor: 010305
+savefig.facecolor: 010305
+savefig.dpi: 300
+pdf.fonttype: 42
+ps.fonttype: 42
+svg.fonttype: path
+
+## Type: Geist for words, Inter for math and Greek
+font.family: Geist, Inter, DejaVu Sans
+font.monospace: Geist Mono, DejaVu Sans Mono
+font.size: 8.5
+mathtext.fontset: custom
+mathtext.rm: Inter
+mathtext.sf: Inter
+mathtext.it: Inter:italic
+mathtext.bf: Inter:medium
+mathtext.cal: Inter:italic
+mathtext.fallback: stixsans
+axes.unicode_minus: True
+
+## Colours
+axes.prop_cycle: cycler('color', ['4DAAD8', 'F1935B', '6AE7AD', '7E66C3', 'F3C451', '4A8289', 'C25656', 'BACAD7'])
+image.cmap: cmc.batlow
+axes.facecolor: 010305
+axes.edgecolor: 8B949A
+axes.labelcolor: E3E8EC
+text.color: E3E8EC
+xtick.color: 8B949A
+ytick.color: 8B949A
+xtick.labelcolor: E3E8EC
+ytick.labelcolor: E3E8EC
+grid.color: 2A343C
+legend.labelcolor: E3E8EC
+boxplot.boxprops.color: E3E8EC
+boxplot.whiskerprops.color: E3E8EC
+boxplot.capprops.color: E3E8EC
+boxplot.flierprops.markeredgecolor: E3E8EC
+errorbar.capsize: 0
+
+## Axes: open frame, outward ticks, no grid
+axes.spines.top: False
+axes.spines.right: False
+axes.linewidth: 0.6
+axes.grid: False
+axes.titlesize: 9.5
+axes.titleweight: medium
+axes.titlelocation: left
+axes.labelsize: 9
+axes.labelpad: 3
+xtick.direction: out
+ytick.direction: out
+xtick.labelsize: 8
+ytick.labelsize: 8
+xtick.major.size: 3
+ytick.major.size: 3
+xtick.minor.size: 1.6
+ytick.minor.size: 1.6
+xtick.major.width: 0.6
+ytick.major.width: 0.6
+xtick.minor.width: 0.5
+ytick.minor.width: 0.5
+xtick.minor.visible: True
+ytick.minor.visible: True
+grid.linewidth: 0.5
+
+## Marks
+lines.linewidth: 1.3
+lines.markersize: 3.5
+patch.linewidth: 0.5
+scatter.edgecolors: face
+
+## Legend
+legend.frameon: False
+legend.fontsize: 8
+legend.title_fontsize: 8
+legend.handlelength: 1.4
+legend.borderaxespad: 0.3

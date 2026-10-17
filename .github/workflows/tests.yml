@@ -1,0 +1,75 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: pip install -e ".[test]" "ruff==0.17.1"
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Generated files match the tokens
+        run: python -m fwl_visual_language check
+      - name: Test with coverage
+        run: pytest -q --cov --cov-report=term-missing --cov-fail-under=90
+
+  wheel:
+    name: Test the installed wheel outside the source tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Build the wheel
+        run: |
+          pip install build
+          python -m build --wheel .
+      - name: Install the wheel with the oldest supported test dependencies
+        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" colorspacious pytest dist/*.whl
+      - name: Run the tests against the installed package
+        run: |
+          mkdir ../wheeltest
+          cp -R tests themes ../wheeltest/
+          cd ../wheeltest
+          python -c "import fwl_visual_language as f, sys; assert 'site-packages' in f.__file__, f.__file__"
+          pytest -q tests
+
+  latex:
+    name: Compile a document with the LaTeX package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install TeX and poppler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-luatex texlive-latex-recommended poppler-utils
+      - name: Install
+        run: pip install -e ".[test]"
+      - name: Compile and check the embedded fonts (fails if the test is skipped)
+        run: |
+          set -o pipefail
+          pytest -rs tests/test_build_latex.py::test_document_compiles_and_embeds_only_geist | tee out.txt
+          grep -q "1 passed" out.txt
