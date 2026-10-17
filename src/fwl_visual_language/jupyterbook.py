@@ -1,0 +1,183 @@
+"""Forming Worlds Lab theme for Jupyter Book 1 (sphinx-book-theme on pydata-sphinx-theme).
+
+The stylesheet keeps the stock layout and sets only the theme's colour and font
+variables (``--pst-color-*``, ``--pst-font-family-*``) for its light and dark
+modes, from the lab roles and figure palette. Variable names follow
+pydata-sphinx-theme 0.16.
+
+Jupyter Book 1 includes every stylesheet in the book's ``_static`` folder, so
+installing is one command::
+
+    python -m fwl_visual_language.jupyterbook book/_static
+"""
+
+import argparse
+import shutil
+from pathlib import Path
+
+from . import __version__, fonts_dir, palette, roles
+from .documenter import _mix, _text_safe
+
+__all__ = ["install_jupyterbook_theme", "jupyterbook_css"]
+
+CSS_NAME = "fwl-jupyterbook.css"
+FONT_DIR = "fwl-fonts"
+MIN_CONTRAST = 4.5
+_GREEK = "U+0370-03FF, U+1F00-1FFF"
+_FONT_FACES = (
+    ("Geist", "Geist-Regular.woff2", "normal", 400, None),
+    ("Geist", "Geist-Italic.woff2", "italic", 400, None),
+    ("Geist", "Geist-Medium.woff2", "normal", 500, None),
+    ("Geist", "Geist-MediumItalic.woff2", "italic", 500, None),
+    ("Geist", "Geist-SemiBold.woff2", "normal", 600, None),
+    ("Geist Mono", "GeistMono-Regular.woff2", "normal", 400, None),
+    ("Inter", "Inter-Regular.woff2", "normal", 400, _GREEK),
+    ("Inter", "Inter-Italic.woff2", "italic", 400, _GREEK),
+)
+_LICENCES = ("OFL-Geist.txt", "OFL-Inter.txt")
+SANS = (
+    '"Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif'
+)
+MONO = '"Geist Mono", "SFMono-Regular", Menlo, Consolas, monospace'
+
+# pydata-sphinx-theme semantic colour -> lab palette hue
+_KINDS = {"info": "signal", "success": "fern", "warning": "magma", "danger": "garnet"}
+
+
+def _variables(mode):
+    """Return the ``--pst-*`` values of one mode as an ordered dict."""
+    r = roles(mode)
+    hues = dict(palette(mode))
+    bg, ink = r["background"], r["text"]
+    sub = _mix(bg, ink, 0.045 if mode == "light" else 0.06)
+    surfaces = (bg, r["surface"], sub)
+    on_accent = r["background"] if mode == "dark" else "#FFFFFF"
+    link = _text_safe(r["link"], ink, surfaces)
+    link_hover = _text_safe(r["link-hover"], ink, surfaces)
+    v = {
+        "--pst-color-background": bg,
+        "--pst-color-on-background": r["surface"],
+        "--pst-color-surface": sub,
+        "--pst-color-on-surface": ink,
+        "--pst-color-text-base": ink,
+        "--pst-color-text-muted": _text_safe(r["muted"], ink, surfaces),
+        "--pst-color-heading": r["heading"],
+        "--pst-color-border": r["line"],
+        "--pst-color-border-muted": r["line"],
+        "--pst-color-blockquote-notch": r["muted"],
+        "--pst-color-primary": link,
+        "--pst-color-primary-text": on_accent,
+        "--pst-color-primary-highlight": link_hover,
+        "--pst-color-primary-bg": _mix(bg, r["accent"], 0.12),
+        "--pst-color-secondary": link_hover,
+        "--pst-color-secondary-text": on_accent,
+        "--pst-color-secondary-highlight": link_hover,
+        "--pst-color-secondary-bg": _mix(bg, r["accent"], 0.12),
+        "--pst-color-accent": _text_safe(r["warm"], ink, surfaces),
+        "--pst-color-accent-bg": _mix(bg, r["warm"], 0.12),
+        "--pst-color-link": link,
+        "--pst-color-link-hover": link_hover,
+        "--pst-color-link-higher-contrast": link,
+        "--pst-color-inline-code": _text_safe(hues["iris"], ink, surfaces),
+        "--pst-color-target": _mix(bg, hues["ochre"], 0.3),
+    }
+    for kind, hue in _KINDS.items():
+        wash = _mix(bg, hues[hue], 0.12)
+        v[f"--pst-color-{kind}"] = _text_safe(hues[hue], ink, (*surfaces, wash))
+        v[f"--pst-color-{kind}-bg"] = wash
+        v[f"--pst-color-{kind}-text"] = on_accent
+        v[f"--pst-color-{kind}-highlight"] = v[f"--pst-color-{kind}"]
+    v["--pst-color-attention"] = v["--pst-color-warning"]
+    v["--pst-color-attention-bg"] = v["--pst-color-warning-bg"]
+    return v
+
+
+def _font_faces():
+    out = []
+    for family, file, style, weight, urange in _FONT_FACES:
+        extra = f"  unicode-range: {urange};\n" if urange else ""
+        out.append(
+            "@font-face {\n"
+            f'  font-family: "{family}";\n'
+            f'  src: url("{FONT_DIR}/{file}") format("woff2");\n'
+            f"  font-style: {style};\n"
+            f"  font-weight: {weight};\n"
+            f"{extra}"
+            "  font-display: swap;\n"
+            "}\n"
+        )
+    return "\n".join(out)
+
+
+def jupyterbook_css():
+    """Return the stylesheet text for Jupyter Book 1, light and dark.
+
+    Returns
+    -------
+    str
+        CSS that sets the pydata-sphinx-theme colour and font variables under
+        ``html[data-theme=light]`` and ``html[data-theme=dark]``. Fonts are
+        referred to as ``fwl-fonts/<file>`` next to the stylesheet.
+    """
+    header = (
+        f"/* Forming Worlds Lab theme for Jupyter Book 1 (fwl-visual-language {__version__}, "
+        "pydata-sphinx-theme 0.16 variables). Generated by fwl_visual_language.jupyterbook "
+        "from the lab tokens; edit the generator, not this file. */\n"
+    )
+    fonts = (
+        ":root {\n"
+        f"  --pst-font-family-base: {SANS};\n"
+        f"  --pst-font-family-heading: {SANS};\n"
+        f"  --pst-font-family-monospace: {MONO};\n"
+        "}\n"
+    )
+    parts = [header, _font_faces(), fonts]
+    for mode in ("light", "dark"):
+        body = "\n".join(f"  {k}: {val};" for k, val in _variables(mode).items())
+        parts.append(f"html[data-theme={mode}] {{\n{body}\n}}\n")
+    return "\n".join(parts)
+
+
+def install_jupyterbook_theme(dest):
+    """Write the stylesheet, the fonts and their licences into ``dest``.
+
+    Parameters
+    ----------
+    dest : str or pathlib.Path
+        The book's ``_static`` folder. It is created if it does not exist.
+
+    Returns
+    -------
+    pathlib.Path
+        Path of the written stylesheet.
+
+    Raises
+    ------
+    OSError
+        If ``dest`` exists and is not a folder, or cannot be written.
+    """
+    dest = Path(dest)
+    fonts = dest / FONT_DIR
+    fonts.mkdir(parents=True, exist_ok=True)
+    for _, file, _, _, _ in _FONT_FACES:
+        shutil.copyfile(fonts_dir() / "woff2" / file, fonts / file)
+    for lic in _LICENCES:
+        shutil.copyfile(fonts_dir() / lic, fonts / lic)
+    css = dest / CSS_NAME
+    css.write_text(jupyterbook_css(), encoding="utf-8")
+    return css
+
+
+def main(argv=None):
+    """Command line entry point: ``python -m fwl_visual_language.jupyterbook DEST``."""
+    parser = argparse.ArgumentParser(
+        prog="python -m fwl_visual_language.jupyterbook",
+        description="Write the Forming Worlds Lab Jupyter Book stylesheet and fonts.",
+    )
+    parser.add_argument("dest", help="the book's _static folder")
+    args = parser.parse_args(argv)
+    print(install_jupyterbook_theme(args.dest))
+
+
+if __name__ == "__main__":
+    main()

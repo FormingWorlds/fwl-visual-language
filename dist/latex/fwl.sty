@@ -1,0 +1,81 @@
+% Forming Worlds Lab LaTeX package (fwl-visual-language 0.1.0). Generated from the lab tokens; edit tokens/fwl.json, not this file.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{fwl}[2026/10/17 v0.1.0 Forming Worlds Lab]
+\RequirePackage{xcolor}
+\RequirePackage{fontspec}
+
+% Ramps
+\definecolor{fwlInk0}{HTML}{FFFFFF}
+\definecolor{fwlInk50}{HTML}{F3F6F9}
+\definecolor{fwlInk100}{HTML}{E3E8EC}
+\definecolor{fwlInk200}{HTML}{CBD2D7}
+\definecolor{fwlInk300}{HTML}{ABB2B8}
+\definecolor{fwlInk400}{HTML}{8B949A}
+\definecolor{fwlInk500}{HTML}{6B747C}
+\definecolor{fwlInk600}{HTML}{475159}
+\definecolor{fwlInk700}{HTML}{2A343C}
+\definecolor{fwlInk800}{HTML}{111C24}
+\definecolor{fwlInk850}{HTML}{061118}
+\definecolor{fwlInk900}{HTML}{03090F}
+\definecolor{fwlInk950}{HTML}{010305}
+\definecolor{fwlInk980}{HTML}{000101}
+\definecolor{fwlSignal300}{HTML}{81C8EF}
+\definecolor{fwlSignal400}{HTML}{4DAAD8}
+\definecolor{fwlSignal500}{HTML}{0072A1}
+\definecolor{fwlSignal600}{HTML}{005B87}
+\definecolor{fwlSignal700}{HTML}{003E60}
+\definecolor{fwlMagma300}{HTML}{F9BB92}
+\definecolor{fwlMagma400}{HTML}{F1935B}
+\definecolor{fwlMagma500}{HTML}{DF6C32}
+\definecolor{fwlMagma600}{HTML}{B74B21}
+\definecolor{fwlMagma700}{HTML}{812E19}
+
+% Roles on white paper
+\definecolor{fwlBackground}{HTML}{FFFFFF}
+\definecolor{fwlSurface}{HTML}{F3F6F9}
+\definecolor{fwlHeading}{HTML}{010305}
+\definecolor{fwlText}{HTML}{111C24}
+\definecolor{fwlMuted}{HTML}{6B747C}
+\definecolor{fwlLine}{HTML}{CBD2D7}
+\definecolor{fwlAxis}{HTML}{6B747C}
+\definecolor{fwlLink}{HTML}{005B87}
+\definecolor{fwlLinkHover}{HTML}{003E60}
+\definecolor{fwlAccent}{HTML}{0072A1}
+\definecolor{fwlWarm}{HTML}{B74B21}
+\definecolor{fwlWarmText}{HTML}{812E19}
+\definecolor{fwlNote}{HTML}{0072A1}
+\definecolor{fwlWarning}{HTML}{B74B21}
+
+% Figure palette, light ground
+\definecolor{fwlSignal}{HTML}{0172A1}
+\definecolor{fwlMagma}{HTML}{B74B21}
+\definecolor{fwlFern}{HTML}{20A976}
+\definecolor{fwlIris}{HTML}{4E2585}
+\definecolor{fwlOchre}{HTML}{BC8D03}
+\definecolor{fwlLagoon}{HTML}{124F54}
+\definecolor{fwlGarnet}{HTML}{741721}
+\definecolor{fwlInk}{HTML}{6E747A}
+
+% Fonts: the files sit in fwl-fonts/ next to this package
+\providecommand{\fwlfontpath}{fwl-fonts/}
+\setmainfont{Geist}[
+  Path=\fwlfontpath,
+  UprightFont=Geist-Regular.ttf,
+  ItalicFont=Geist-Italic.ttf,
+  BoldFont=Geist-SemiBold.ttf,
+  BoldItalicFont=Geist-MediumItalic.ttf,
+  FontFace={md}{n}{Geist-Medium.ttf},
+  FontFace={md}{it}{Geist-MediumItalic.ttf}]
+\setsansfont{Geist}[
+  Path=\fwlfontpath,
+  UprightFont=Geist-Regular.ttf,
+  ItalicFont=Geist-Italic.ttf,
+  BoldFont=Geist-SemiBold.ttf,
+  BoldItalicFont=Geist-MediumItalic.ttf]
+\setmonofont{Geist Mono}[
+  Path=\fwlfontpath,
+  UprightFont=GeistMono-Regular.ttf,
+  BoldFont=GeistMono-Medium.ttf]
+\newcommand{\fwlmedium}{\fontseries{md}\selectfont}
+\color{fwlText}
+\endinput

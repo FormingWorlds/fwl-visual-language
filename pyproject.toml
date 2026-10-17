@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fwl-visual-language"
+dynamic = ["version"]
+description = "Forming Worlds Lab visual identity: design tokens and the themes built from them for the website, figures, documentation, documents and slides."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0 AND OFL-1.1"
+license-files = [
+    "LICENSE",
+    "src/fwl_visual_language/fonts/OFL-Geist.txt",
+    "src/fwl_visual_language/fonts/OFL-Inter.txt",
+]
+authors = [{ name = "Forming Worlds Lab" }]
+dependencies = []
+keywords = ["design-tokens", "theme", "matplotlib", "documenter", "sphinx"]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-cov>=4", "colorspacious>=1.1", "numpy>=1.22", "matplotlib>=3.7"]
+
+[project.urls]
+Repository = "https://github.com/FormingWorlds/fwl-visual-language"
+
+[project.scripts]
+fwl-visual-language = "fwl_visual_language.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "fwl_visual_language.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+fwl_visual_language = ["tokens/*.json", "fonts/*.txt", "fonts/ttf/*", "fonts/woff2/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["fwl_visual_language"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]

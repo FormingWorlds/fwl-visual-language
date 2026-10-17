@@ -1,0 +1,108 @@
+/* Forming Worlds Lab design tokens (fwl-visual-language 0.1.0). Generated from the lab tokens; edit tokens/fwl.json, not this file. */
+
+:root {
+  --fwl-ink-0: #FFFFFF;
+  --fwl-ink-50: #F3F6F9;
+  --fwl-ink-100: #E3E8EC;
+  --fwl-ink-200: #CBD2D7;
+  --fwl-ink-300: #ABB2B8;
+  --fwl-ink-400: #8B949A;
+  --fwl-ink-500: #6B747C;
+  --fwl-ink-600: #475159;
+  --fwl-ink-700: #2A343C;
+  --fwl-ink-800: #111C24;
+  --fwl-ink-850: #061118;
+  --fwl-ink-900: #03090F;
+  --fwl-ink-950: #010305;
+  --fwl-ink-980: #000101;
+  --fwl-signal-300: #81C8EF;
+  --fwl-signal-400: #4DAAD8;
+  --fwl-signal-500: #0072A1;
+  --fwl-signal-600: #005B87;
+  --fwl-signal-700: #003E60;
+  --fwl-magma-300: #F9BB92;
+  --fwl-magma-400: #F1935B;
+  --fwl-magma-500: #DF6C32;
+  --fwl-magma-600: #B74B21;
+  --fwl-magma-700: #812E19;
+  --fwl-font-text: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --fwl-font-math: "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --fwl-font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  --fwl-background: #010305;
+  --fwl-surface: #03090F;
+  --fwl-heading: #E3E8EC;
+  --fwl-text: #CBD2D7;
+  --fwl-muted: #8B949A;
+  --fwl-line: #2A343C;
+  --fwl-axis: #8B949A;
+  --fwl-link: #81C8EF;
+  --fwl-link-hover: #4DAAD8;
+  --fwl-accent: #0072A1;
+  --fwl-warm: #DF6C32;
+  --fwl-warm-text: #F9BB92;
+  --fwl-note: #4DAAD8;
+  --fwl-warning: #F1935B;
+  --fwl-figure-1: #4DAAD8;  /* signal */
+  --fwl-figure-2: #F1935B;  /* magma */
+  --fwl-figure-3: #6AE7AD;  /* fern */
+  --fwl-figure-4: #7E66C3;  /* iris */
+  --fwl-figure-5: #F3C451;  /* ochre */
+  --fwl-figure-6: #4A8289;  /* lagoon */
+  --fwl-figure-7: #C25656;  /* garnet */
+  --fwl-figure-8: #BACAD7;  /* ink */
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --fwl-background: #F3F6F9;
+    --fwl-surface: #FFFFFF;
+    --fwl-heading: #010305;
+    --fwl-text: #111C24;
+    --fwl-muted: #6B747C;
+    --fwl-line: #CBD2D7;
+    --fwl-axis: #6B747C;
+    --fwl-link: #005B87;
+    --fwl-link-hover: #003E60;
+    --fwl-accent: #0072A1;
+    --fwl-warm: #B74B21;
+    --fwl-warm-text: #812E19;
+    --fwl-note: #0072A1;
+    --fwl-warning: #B74B21;
+    --fwl-figure-1: #0172A1;  /* signal */
+    --fwl-figure-2: #B74B21;  /* magma */
+    --fwl-figure-3: #20A976;  /* fern */
+    --fwl-figure-4: #4E2585;  /* iris */
+    --fwl-figure-5: #BC8D03;  /* ochre */
+    --fwl-figure-6: #124F54;  /* lagoon */
+    --fwl-figure-7: #741721;  /* garnet */
+    --fwl-figure-8: #6E747A;  /* ink */
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --fwl-background: #F3F6F9;
+  --fwl-surface: #FFFFFF;
+  --fwl-heading: #010305;
+  --fwl-text: #111C24;
+  --fwl-muted: #6B747C;
+  --fwl-line: #CBD2D7;
+  --fwl-axis: #6B747C;
+  --fwl-link: #005B87;
+  --fwl-link-hover: #003E60;
+  --fwl-accent: #0072A1;
+  --fwl-warm: #B74B21;
+  --fwl-warm-text: #812E19;
+  --fwl-note: #0072A1;
+  --fwl-warning: #B74B21;
+  --fwl-figure-1: #0172A1;  /* signal */
+  --fwl-figure-2: #B74B21;  /* magma */
+  --fwl-figure-3: #20A976;  /* fern */
+  --fwl-figure-4: #4E2585;  /* iris */
+  --fwl-figure-5: #BC8D03;  /* ochre */
+  --fwl-figure-6: #124F54;  /* lagoon */
+  --fwl-figure-7: #741721;  /* garnet */
+  --fwl-figure-8: #6E747A;  /* ink */
+  color-scheme: light;
+}
