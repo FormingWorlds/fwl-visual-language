@@ -3,7 +3,7 @@
 The package defines every ramp step, the paper roles and the figure palette as
 ``xcolor`` colours, and sets Geist as the document face with Geist Mono for
 code, through ``fontspec`` (LuaLaTeX or XeLaTeX). Math fonts are left to the
-document.
+document; Geist has no Greek letters, so Greek needs a math setup.
 
 Install it next to a document::
 
@@ -28,14 +28,24 @@ _TTF = (
     "Geist-Medium.ttf",
     "Geist-MediumItalic.ttf",
     "Geist-SemiBold.ttf",
+    "Geist-SemiBoldItalic.ttf",
     "GeistMono-Regular.ttf",
     "GeistMono-Medium.ttf",
 )
 _LICENCES = ("OFL-Geist.txt",)
+# Bold is SemiBold (600) upright and italic; \fwlmedium selects Medium (500).
+_GEIST = """
+  Path=\\fwlfontpath,
+  UprightFont=Geist-Regular.ttf,
+  ItalicFont=Geist-Italic.ttf,
+  BoldFont=Geist-SemiBold.ttf,
+  BoldItalicFont=Geist-SemiBoldItalic.ttf,
+  FontFace={md}{n}{Geist-Medium.ttf},
+  FontFace={md}{it}{Geist-MediumItalic.ttf}]"""
 
 
 def latex_name(*parts):
-    """Return a colour name in the package's camel case, for example ``fwlInkNineFifty``.
+    """Return a colour name in the package's camel case, for example ``fwlInk950``.
 
     Parameters
     ----------
@@ -94,24 +104,13 @@ def sty(release=None):
         "",
         "% Fonts: the files sit in fwl-fonts/ next to this package",
         "\\providecommand{\\fwlfontpath}{fwl-fonts/}",
-        f"\\setmainfont{{{fonts['text']}}}[",
-        "  Path=\\fwlfontpath,",
-        "  UprightFont=Geist-Regular.ttf,",
-        "  ItalicFont=Geist-Italic.ttf,",
-        "  BoldFont=Geist-SemiBold.ttf,",
-        "  BoldItalicFont=Geist-MediumItalic.ttf,",
-        "  FontFace={md}{n}{Geist-Medium.ttf},",
-        "  FontFace={md}{it}{Geist-MediumItalic.ttf}]",
-        f"\\setsansfont{{{fonts['text']}}}[",
-        "  Path=\\fwlfontpath,",
-        "  UprightFont=Geist-Regular.ttf,",
-        "  ItalicFont=Geist-Italic.ttf,",
-        "  BoldFont=Geist-SemiBold.ttf,",
-        "  BoldItalicFont=Geist-MediumItalic.ttf]",
+        f"\\setmainfont{{{fonts['text']}}}[" + _GEIST,
+        f"\\setsansfont{{{fonts['text']}}}[" + _GEIST,
         f"\\setmonofont{{{fonts['mono']}}}[",
         "  Path=\\fwlfontpath,",
         "  UprightFont=GeistMono-Regular.ttf,",
-        "  BoldFont=GeistMono-Medium.ttf]",
+        "  BoldFont=GeistMono-Medium.ttf,",
+        "  FontFace={md}{n}{GeistMono-Medium.ttf}]",
         "\\newcommand{\\fwlmedium}{\\fontseries{md}\\selectfont}",
         "\\color{fwlText}",
         "\\endinput",

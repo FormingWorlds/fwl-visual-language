@@ -1,4 +1,4 @@
-"""Web stylesheets: CSS custom properties and the Tailwind v4 theme block.
+"""Web stylesheets: CSS custom properties, the Tailwind v4 theme block, web fonts.
 
 ``tokens_css`` gives every ramp step, role and figure colour as a ``--fwl-*``
 custom property. Dark is the default on ``:root``; the light (mist) theme
@@ -8,25 +8,25 @@ system prefers light and the page sets no ``data-theme``.
 ``tailwind_theme_css`` gives the ``@theme`` block that the lab website builds
 its utility classes from (``bg-ink-950``, ``text-signal-300``), in the same
 ``oklch()`` form the site uses.
+
+``install_web_fonts`` writes ``fwl-fonts.css`` with the ``woff2`` files and
+their licences::
+
+    python -m fwl_visual_language.css static/css
 """
 
-from . import __version__, fonts_dir, oklch_css, palette, ramp, roles, tokens
+import argparse
 
-__all__ = ["tailwind_theme_css", "tokens_css", "web_fonts_css"]
+from . import __version__, oklch_css, palette, ramp, roles, tokens
+from ._web import font_faces_css, font_stack, install
 
+__all__ = ["install_web_fonts", "tailwind_theme_css", "tokens_css", "web_fonts_css"]
+
+FONTS_CSS_NAME = "fwl-fonts.css"
 _HEADER = (
     "/* Forming Worlds Lab {what} (fwl-visual-language {version}). Generated from "
     "the lab tokens; edit tokens/fwl.json, not this file. */\n"
 )
-
-
-_GENERIC = {"serif", "sans-serif", "monospace", "system-ui", "ui-monospace", "ui-sans-serif"}
-
-
-def _font_stack(primary, fallback):
-    # family names are quoted; CSS generic keywords and vendor keywords must not be
-    names = list(dict.fromkeys([primary, *fallback]))
-    return ", ".join(n if n in _GENERIC or n.startswith("-") else f'"{n}"' for n in names)
 
 
 def _role_lines(mode, indent="  "):
@@ -48,18 +48,13 @@ def tokens_css():
     str
         CSS text: ramp steps (``--fwl-ink-950``), font roles, and the roles and
         figure colours of the dark theme on ``:root`` with the light theme as
-        an override.
+        an override. The light figure colours reach 3:1 on white
+        (``--fwl-surface``), not on the mist ground; draw charts on a surface.
     """
-    t = tokens()
-    fonts = t["fonts"]
     base = []
-    for name in t["ramps"]:
+    for name in tokens()["ramps"]:
         base += [f"  --fwl-{name}-{step}: {hexv};" for step, hexv in ramp(name).items()]
-    base += [
-        f"  --fwl-font-text: {_font_stack(fonts['text'], fonts['fallback_sans'])};",
-        f"  --fwl-font-math: {_font_stack(fonts['math'], fonts['fallback_sans'])};",
-        f"  --fwl-font-mono: {_font_stack(fonts['mono'], fonts['fallback_mono'])};",
-    ]
+    base += [f"  --fwl-font-{role}: {font_stack(role)};" for role in ("text", "math", "mono")]
     dark = _role_lines("dark") + _palette_lines("dark") + ["  color-scheme: dark;"]
     light = _role_lines("light", "    ") + _palette_lines("light", "    ")
     light.append("    color-scheme: light;")
@@ -85,7 +80,6 @@ def tailwind_theme_css():
         into utility classes.
     """
     t = tokens()
-    fonts = t["fonts"]
     lines = []
     for name in t["ramps"]:
         lines += [
@@ -93,9 +87,9 @@ def tailwind_theme_css():
             for step in t["ramps"][name]["steps"]
         ]
     lines += [
-        f"  --font-sans: {_font_stack(fonts['text'], fonts['fallback_sans'])};",
-        f"  --font-mono: {_font_stack(fonts['mono'], fonts['fallback_mono'])};",
-        f"  --font-math: {_font_stack(fonts['math'], fonts['fallback_sans'])};",
+        f"  --font-sans: {font_stack('text')};",
+        f"  --font-mono: {font_stack('mono')};",
+        f"  --font-math: {font_stack('math')};",
     ]
     return (
         _HEADER.format(what="Tailwind theme", version=__version__)
@@ -105,51 +99,49 @@ def tailwind_theme_css():
     )
 
 
-_WEB_FACES = (
-    ("Geist", "Geist-Regular.woff2", "normal", 400, None),
-    ("Geist", "Geist-Italic.woff2", "italic", 400, None),
-    ("Geist", "Geist-Medium.woff2", "normal", 500, None),
-    ("Geist", "Geist-MediumItalic.woff2", "italic", 500, None),
-    ("Geist", "Geist-SemiBold.woff2", "normal", 600, None),
-    ("Geist Mono", "GeistMono-Regular.woff2", "normal", 400, None),
-    ("Geist Mono", "GeistMono-Medium.woff2", "normal", 500, None),
-    ("Inter", "Inter-Regular.woff2", "normal", 400, None),
-    ("Inter", "Inter-Italic.woff2", "italic", 400, None),
-    ("Inter", "Inter-Medium.woff2", "normal", 500, None),
-    ("Inter", "Inter-MediumItalic.woff2", "italic", 500, None),
-)
-
-
-def web_fonts_css(font_dir="fonts"):
+def web_fonts_css():
     """Return ``@font-face`` rules for self-hosting the lab fonts.
-
-    Parameters
-    ----------
-    font_dir : str
-        URL path of the folder that holds the ``woff2`` files, relative to the
-        stylesheet.
 
     Returns
     -------
     str
-        One ``@font-face`` rule per bundled web font.
+        One rule per bundled web font, with the files in ``fwl-fonts/`` next to
+        the stylesheet. Inter is limited to Greek, which Geist lacks.
+    """
+    return _HEADER.format(what="web fonts", version=__version__) + "\n" + font_faces_css()
+
+
+def install_web_fonts(dest):
+    """Write ``fwl-fonts.css``, the ``woff2`` files and their licences into ``dest``.
+
+    Parameters
+    ----------
+    dest : str or pathlib.Path
+        Target folder; created if it does not exist.
+
+    Returns
+    -------
+    pathlib.Path
+        Path of the written stylesheet.
 
     Raises
     ------
-    FileNotFoundError
-        If a listed font file is missing from the package.
+    OSError
+        If ``dest`` exists and is not a folder, or cannot be written.
     """
-    out = [_HEADER.format(what="web fonts", version=__version__)]
-    for family, file, style, weight, _ in _WEB_FACES:
-        if not (fonts_dir() / "woff2" / file).is_file():
-            raise FileNotFoundError(file)
-        out.append(
-            "@font-face {\n"
-            f'  font-family: "{family}";\n'
-            f'  src: url("{font_dir}/{file}") format("woff2");\n'
-            f"  font-style: {style};\n"
-            f"  font-weight: {weight};\n"
-            "  font-display: swap;\n"
-            "}\n"
-        )
-    return "\n".join(out)
+    return install(dest, FONTS_CSS_NAME, web_fonts_css())
+
+
+def main(argv=None):
+    """Command line entry point: ``python -m fwl_visual_language.css DEST``."""
+    parser = argparse.ArgumentParser(
+        prog="python -m fwl_visual_language.css",
+        description="Write the Forming Worlds Lab web font stylesheet and fonts.",
+    )
+    parser.add_argument("dest", help="folder for fwl-fonts.css and fwl-fonts/")
+    args = parser.parse_args(argv)
+    print(install_web_fonts(args.dest))
+
+
+if __name__ == "__main__":
+    main()

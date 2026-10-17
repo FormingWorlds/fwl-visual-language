@@ -1,5 +1,6 @@
 ## Forming Worlds Lab figure style, dark mode (fwl-visual-language 0.1.0).
 ## Generated from the lab tokens; edit tokens/fwl.json, not this file.
+## image.cmap names a Crameri map: import cmcrameri before plotting images.
 
 ## Figure: one column of a two-column page; PDF and PS embed TrueType fonts,
 ## SVG draws text as paths so it renders without the fonts installed
@@ -22,7 +23,6 @@ mathtext.rm: Inter
 mathtext.sf: Inter
 mathtext.it: Inter:italic
 mathtext.bf: Inter:medium
-mathtext.bfit: Inter:italic:medium
 mathtext.cal: Inter:italic
 mathtext.fallback: stixsans
 axes.unicode_minus: True

@@ -20,6 +20,17 @@ def test_committed_dist_is_current():
     assert cli.check(DIST) == [], "run: python -m fwl_visual_language build"
 
 
+@pytest.mark.parametrize("rel", [r for r in cli.OUTPUTS if r.endswith(".css")])
+def test_css_outputs_have_balanced_braces(rel):
+    # a stray brace makes a browser drop the next rule; regex parsers skip it
+    text = re.sub(r"/\*.*?\*/", "", cli.OUTPUTS[rel](), flags=re.S)
+    depth = 0
+    for ch in text:
+        depth += {"{": 1, "}": -1}.get(ch, 0)
+        assert depth >= 0, rel
+    assert depth == 0, rel
+
+
 def test_build_then_check_round_trip(tmp_path):
     written = cli.build(tmp_path)
     assert [p.relative_to(tmp_path).as_posix() for p in written] == list(cli.OUTPUTS)
@@ -31,7 +42,14 @@ def test_check_reports_a_hand_edit_and_a_missing_file(tmp_path):
     target = tmp_path / "css" / "fwl-tokens.css"
     target.write_text(target.read_text() + "/* edit */\n")
     (tmp_path / "latex" / "fwl.sty").unlink()
-    assert cli.check(tmp_path) == ["css/fwl-tokens.css", "latex/fwl.sty"]
+    (tmp_path / "css" / "old-name.css").write_text("left behind")
+    (tmp_path / "mpl" / "fwl-dark.mplstyle").write_bytes(b"\xff\xfe not utf-8")
+    assert cli.check(tmp_path) == [
+        "css/fwl-tokens.css",
+        "mpl/fwl-dark.mplstyle",
+        "latex/fwl.sty",
+        "css/old-name.css",
+    ]
 
 
 def test_main_build_and_check_exit_codes(tmp_path, capsys):
@@ -104,8 +122,9 @@ def test_document_compiles_and_embeds_only_geist(tmp_path):
     latex.install_latex(tmp_path)
     (tmp_path / "doc.tex").write_text(
         "\\documentclass{article}\\usepackage{fwl}\\begin{document}"
-        "Text \\textit{italic} {\\fwlmedium medium} \\textbf{bold} \\texttt{mono} "
-        "\\textcolor{fwlLink}{link}\\end{document}\n"
+        "Text \\textit{italic} {\\fwlmedium medium {\\itshape italic}} \\textbf{bold} "
+        "\\textbf{\\textit{bold italic}} \\textsf{\\fwlmedium sans} \\texttt{mono "
+        "{\\fwlmedium medium}} \\textcolor{fwlLink}{link}\\end{document}\n"
     )
     run = subprocess.run(
         ["lualatex", "-interaction=nonstopmode", "-halt-on-error", "doc.tex"],
@@ -115,6 +134,9 @@ def test_document_compiles_and_embeds_only_geist(tmp_path):
         timeout=300,
     )
     assert run.returncode == 0, run.stdout[-2000:]
+    log = (tmp_path / "doc.log").read_text(errors="replace")
+    assert "Missing character" not in log
+    assert "Font shape" not in log, re.findall(r"Font shape.*", log)
     fonts = subprocess.run(
         ["pdffonts", "doc.pdf"], cwd=tmp_path, capture_output=True, text=True
     ).stdout
@@ -123,6 +145,9 @@ def test_document_compiles_and_embeds_only_geist(tmp_path):
         "Geist-Regular",
         "Geist-Italic",
         "Geist-Medium",
+        "Geist-MediumItalic",
         "Geist-SemiBold",
+        "Geist-SemiBoldItalic",
         "GeistMono-Regular",
+        "GeistMono-Medium",
     }

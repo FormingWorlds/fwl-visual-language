@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("fonts/Geist-Regular.woff2") format("woff2");
+  src: url("fwl-fonts/Geist-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -10,7 +10,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("fonts/Geist-Italic.woff2") format("woff2");
+  src: url("fwl-fonts/Geist-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 400;
   font-display: swap;
@@ -18,7 +18,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("fonts/Geist-Medium.woff2") format("woff2");
+  src: url("fwl-fonts/Geist-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
   font-display: swap;
@@ -26,7 +26,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("fonts/Geist-MediumItalic.woff2") format("woff2");
+  src: url("fwl-fonts/Geist-MediumItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 500;
   font-display: swap;
@@ -34,7 +34,7 @@
 
 @font-face {
   font-family: "Geist";
-  src: url("fonts/Geist-SemiBold.woff2") format("woff2");
+  src: url("fwl-fonts/Geist-SemiBold.woff2") format("woff2");
   font-style: normal;
   font-weight: 600;
   font-display: swap;
@@ -42,7 +42,7 @@
 
 @font-face {
   font-family: "Geist Mono";
-  src: url("fonts/GeistMono-Regular.woff2") format("woff2");
+  src: url("fwl-fonts/GeistMono-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;
@@ -50,7 +50,7 @@
 
 @font-face {
   font-family: "Geist Mono";
-  src: url("fonts/GeistMono-Medium.woff2") format("woff2");
+  src: url("fwl-fonts/GeistMono-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
   font-display: swap;
@@ -58,32 +58,36 @@
 
 @font-face {
   font-family: "Inter";
-  src: url("fonts/Inter-Regular.woff2") format("woff2");
+  src: url("fwl-fonts/Inter-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Inter";
-  src: url("fonts/Inter-Italic.woff2") format("woff2");
+  src: url("fwl-fonts/Inter-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 400;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Inter";
-  src: url("fonts/Inter-Medium.woff2") format("woff2");
+  src: url("fwl-fonts/Inter-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
 @font-face {
   font-family: "Inter";
-  src: url("fonts/Inter-MediumItalic.woff2") format("woff2");
+  src: url("fwl-fonts/Inter-MediumItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 500;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }

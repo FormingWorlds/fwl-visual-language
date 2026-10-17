@@ -1,8 +1,8 @@
 """Command line: ``python -m fwl_visual_language build [DIST]`` writes every theme file.
 
 ``check`` builds into memory and compares with an existing ``dist`` folder; it
-exits with status 1 and lists the files that differ, so a hand edit of a
-generated file or a token change without a rebuild fails CI.
+exits with status 1 and lists the files that differ or do not belong there, so
+a hand edit of a generated file or a token change without a rebuild fails CI.
 """
 
 import argparse
@@ -59,14 +59,18 @@ def check(dist):
     Returns
     -------
     list of str
-        Relative paths that differ; empty when ``dist`` is current.
+        Relative paths that are missing, differ, or are not an output (a file
+        left behind by a renamed output); empty when ``dist`` is current.
     """
     dist = Path(dist)
     stale = []
     for rel, make in OUTPUTS.items():
         path = dist / rel
-        if not path.is_file() or path.read_text(encoding="utf-8") != make():
+        if not path.is_file() or path.read_text(encoding="utf-8", errors="replace") != make():
             stale.append(rel)
+    if dist.is_dir():
+        extra = {p.relative_to(dist).as_posix() for p in dist.rglob("*") if p.is_file()}
+        stale += sorted(extra - set(OUTPUTS))
     return stale
 
 

@@ -128,7 +128,7 @@
       "surface": "ink-0",
       "heading": "ink-950",
       "text": "ink-800",
-      "muted": "ink-500",
+      "muted": "ink-600",
       "line": "ink-200",
       "axis": "ink-500",
       "link": "signal-600",
@@ -144,7 +144,7 @@
       "surface": "ink-50",
       "heading": "ink-950",
       "text": "ink-800",
-      "muted": "ink-500",
+      "muted": "ink-600",
       "line": "ink-200",
       "axis": "ink-500",
       "link": "signal-600",
@@ -168,8 +168,8 @@
       "ink"
     ],
     "light": [
-      "#0172A1",
-      "#B74B21",
+      "signal-500",
+      "magma-600",
       "#20A976",
       "#4E2585",
       "#BC8D03",
@@ -178,8 +178,8 @@
       "#6E747A"
     ],
     "dark": [
-      "#4DAAD8",
-      "#F1935B",
+      "signal-400",
+      "magma-400",
       "#6AE7AD",
       "#7E66C3",
       "#F3C451",

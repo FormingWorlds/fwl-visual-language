@@ -4,6 +4,9 @@ Words are set in Geist; math symbols and Greek letters in Inter, which has the
 Greek that Geist lacks; plain-text Greek outside math falls back to Inter per
 glyph. The layout (figure size, open axes, outward ticks, type sizes) is the
 one of the fwl-mpl package, which loads these sheets and registers the fonts.
+The default colour map ``cmc.batlow`` exists once ``cmcrameri`` is imported,
+which fwl-mpl does; ``mathtext.bfit`` is left out because matplotlib 3.7 does
+not know it.
 """
 
 from . import __version__, palette, roles, tokens
@@ -15,6 +18,7 @@ MPL_MODES = ("paper", "dark")
 _TEMPLATE = """\
 ## Forming Worlds Lab figure style, {mode} mode (fwl-visual-language {version}).
 ## Generated from the lab tokens; edit tokens/fwl.json, not this file.
+## image.cmap names a Crameri map: import cmcrameri before plotting images.
 
 ## Figure: one column of a two-column page; PDF and PS embed TrueType fonts,
 ## SVG draws text as paths so it renders without the fonts installed
@@ -37,7 +41,6 @@ mathtext.rm: {math_font}
 mathtext.sf: {math_font}
 mathtext.it: {math_font}:italic
 mathtext.bf: {math_font}:medium
-mathtext.bfit: {math_font}:italic:medium
 mathtext.cal: {math_font}:italic
 mathtext.fallback: stixsans
 axes.unicode_minus: True

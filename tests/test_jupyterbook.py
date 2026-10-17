@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import fwl_visual_language as fvl
+from fwl_visual_language import _web
 from fwl_visual_language import jupyterbook as jb
 
 # Every --pst-color-* and --pst-font-family-* name in pydata-sphinx-theme 0.16.1.
@@ -52,14 +53,21 @@ def test_text_colours_read_on_every_surface(mode):
             assert fvl.contrast(v[name], s) >= 4.5, (mode, name, s)
     for kind in jb._KINDS:
         assert fvl.contrast(v[f"--pst-color-{kind}"], v[f"--pst-color-{kind}-bg"]) >= 4.5
+        # filled badges and buttons: text colour on the kind colour
+        assert fvl.contrast(v[f"--pst-color-{kind}-text"], v[f"--pst-color-{kind}"]) >= 4.5, kind
+    for kind in ("primary", "secondary"):
+        assert fvl.contrast(v[f"--pst-color-{kind}-text"], v[f"--pst-color-{kind}"]) >= 4.5, kind
 
 
-@pytest.mark.parametrize("mode", MODES)
-def test_both_modes_set_the_same_variables_and_follow_the_roles(mode):
+def test_both_modes_set_the_same_variables():
     css = jb.jupyterbook_css()
     light = set(re.findall(r"(--pst-[a-z-]+):", _block(css, "html[data-theme=light]")))
     dark = set(re.findall(r"(--pst-[a-z-]+):", _block(css, "html[data-theme=dark]")))
     assert light == dark
+
+
+@pytest.mark.parametrize("mode", MODES)
+def test_variables_follow_the_roles(mode):
     v = jb._variables(mode)
     assert v["--pst-color-background"] == fvl.role(mode, "background")
     assert v["--pst-color-link"] == fvl.role(mode, "link")
@@ -71,7 +79,8 @@ def test_fonts_and_greek_range():
     assert f"--pst-font-family-base: {jb.SANS};" in root
     assert f"--pst-font-family-monospace: {jb.MONO};" in root
     faces = re.findall(r"@font-face \{([^}]*)\}", css)
-    assert len(faces) == len(jb._FONT_FACES)
+    assert len(faces) == len(_web.FACES)
+    assert "html {\n  font-synthesis: none;\n}" in css
     inter = [f for f in faces if '"Inter"' in f]
     assert inter and all("unicode-range: U+0370-03FF, U+1F00-1FFF;" in f for f in inter)
 
@@ -86,10 +95,10 @@ def test_install_writes_stylesheet_fonts_and_licences(tmp_path):
     out = jb.install_jupyterbook_theme(tmp_path / "_static")
     assert out == tmp_path / "_static" / jb.CSS_NAME
     assert out.read_text(encoding="utf-8") == jb.jupyterbook_css()
-    fonts = tmp_path / "_static" / jb.FONT_DIR
-    for _, file, _, _, _ in jb._FONT_FACES:
+    fonts = tmp_path / "_static" / _web.FONT_DIR
+    for _, file, _, _ in _web.FACES:
         assert (fonts / file).read_bytes() == (fvl.fonts_dir() / "woff2" / file).read_bytes()
-    for lic in jb._LICENCES:
+    for lic in _web.LICENCES:
         assert (fonts / lic).is_file()
 
 

@@ -49,6 +49,14 @@
 }
 
 @font-face {
+  font-family: "Geist Mono";
+  src: url("fwl-fonts/GeistMono-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Inter";
   src: url("fwl-fonts/Inter-Regular.woff2") format("woff2");
   font-style: normal;
@@ -66,10 +74,31 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Inter";
+  src: url("fwl-fonts/Inter-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("fwl-fonts/Inter-MediumItalic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 500;
+  unicode-range: U+0370-03FF, U+1F00-1FFF;
+  font-display: swap;
+}
+
 :root {
-  --pst-font-family-base: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --pst-font-family-heading: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --pst-font-family-monospace: "Geist Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --pst-font-family-base: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --pst-font-family-heading: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --pst-font-family-monospace: "Geist Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
+}
+html {
+  font-synthesis: none;
 }
 
 html[data-theme=light] {
@@ -78,11 +107,11 @@ html[data-theme=light] {
   --pst-color-surface: #E9ECEF;
   --pst-color-on-surface: #111C24;
   --pst-color-text-base: #111C24;
-  --pst-color-text-muted: #636C74;
+  --pst-color-text-muted: #475159;
   --pst-color-heading: #010305;
   --pst-color-border: #CBD2D7;
   --pst-color-border-muted: #CBD2D7;
-  --pst-color-blockquote-notch: #6B747C;
+  --pst-color-blockquote-notch: #475159;
   --pst-color-primary: #005B87;
   --pst-color-primary-text: #FFFFFF;
   --pst-color-primary-highlight: #003E60;
@@ -98,10 +127,10 @@ html[data-theme=light] {
   --pst-color-link-higher-contrast: #005B87;
   --pst-color-inline-code: #4E2585;
   --pst-color-target: #E2D6AF;
-  --pst-color-info: #026C98;
+  --pst-color-info: #016C98;
   --pst-color-info-bg: #D6E6EE;
   --pst-color-info-text: #FFFFFF;
-  --pst-color-info-highlight: #026C98;
+  --pst-color-info-highlight: #016C98;
   --pst-color-success: #1B7658;
   --pst-color-success-bg: #DAEDE9;
   --pst-color-success-text: #FFFFFF;

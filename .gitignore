@@ -3,3 +3,7 @@ __pycache__/
 *.egg-info/
 .coverage
 build/
+wheelhouse/
+.pytest_cache/
+.ruff_cache/
+htmlcov/

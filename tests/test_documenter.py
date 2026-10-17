@@ -7,6 +7,7 @@ import sys
 import pytest
 
 import fwl_visual_language as fvl
+from fwl_visual_language import _web
 from fwl_visual_language import documenter as docs_theme
 
 MODES = ("light", "dark")
@@ -18,9 +19,9 @@ def test_contrast_reference_values():
 
 
 def test_mix_end_points_and_midpoint():
-    assert docs_theme._mix("#000000", "#FFFFFF", 0) == "#000000"
-    assert docs_theme._mix("#000000", "#FFFFFF", 1) == "#FFFFFF"
-    assert docs_theme._mix("#000000", "#FFFFFF", 0.5) == "#808080"
+    assert _web.mix("#000000", "#FFFFFF", 0) == "#000000"
+    assert _web.mix("#000000", "#FFFFFF", 1) == "#FFFFFF"
+    assert _web.mix("#000000", "#FFFFFF", 0.5) == "#808080"
 
 
 @pytest.mark.parametrize("mode", MODES)
@@ -38,18 +39,18 @@ def test_washes_in_the_stylesheet_are_the_ones_checked(mode):
     css = docs_theme.documenter_css()
     block = css.split(docs_theme._MODE_SELECTOR[mode] + " {\n", 1)[1].split("}\n", 1)[0]
     for name, wash in docs_theme._tokens(mode)["washes"].items():
-        assert f"--fwl-{name}-wash: {wash};" in block
+        assert f"--fwl-doc-{name}-wash: {wash};" in block
 
 
 @pytest.mark.parametrize("mode", MODES)
 def test_text_safe_keeps_a_colour_that_already_passes(mode):
     t = docs_theme._tokens(mode)
     ok = t["safe"]["lagoon"] if mode == "light" else t["safe"]["fern"]
-    assert docs_theme._text_safe(ok, t["ink"], (t["bg"], t["sub"])) == ok
+    assert _web.text_safe(ok, t["ink"], (t["bg"], t["sub"])) == ok
 
 
 def test_text_safe_falls_back_to_ink_when_no_mix_passes():
-    assert docs_theme._text_safe("#777777", "#777777", ("#777777",)) == "#777777"
+    assert _web.text_safe("#777777", "#777777", ("#777777",)) == "#777777"
 
 
 def test_fill_colours_are_the_figure_palette():
@@ -57,24 +58,24 @@ def test_fill_colours_are_the_figure_palette():
     for mode in MODES:
         for name, colour in fvl.palette(mode):
             if name != "ink":
-                assert f"--fwl-{name}-fill: {colour};" in css
+                assert f"--fwl-doc-{name}-fill: {colour};" in css
 
 
 def test_both_modes_define_every_variable():
     css = docs_theme.documenter_css()
-    names = set(re.findall(r"(--fwl-[a-z-]+):", css))
+    names = set(re.findall(r"(--fwl-doc-[a-z-]+):", css))
     light_block, dark_block = (
         css.split(f"{sel} {{\n", 1)[1].split("}\n", 1)[0]
         for sel in docs_theme._MODE_SELECTOR.values()
     )
     for block in (light_block, dark_block):
-        assert set(re.findall(r"(--fwl-[a-z-]+):", block)) == names
+        assert set(re.findall(r"(--fwl-doc-[a-z-]+):", block)) == names
 
 
 def test_every_variable_used_is_defined():
     css = docs_theme.documenter_css()
-    defined = set(re.findall(r"(--fwl-[a-z-]+):", css))
-    used = set(re.findall(r"var\((--fwl-[a-z-]+)\)", css))
+    defined = set(re.findall(r"(--fwl-doc-[a-z-]+):", css))
+    used = set(re.findall(r"var\((--fwl-doc-[a-z-]+)\)", css))
     assert used <= defined
 
 
@@ -90,7 +91,7 @@ def test_stylesheet_structure_and_scope():
     modes = [b for b in blocks if b[0] in docs_theme._MODE_SELECTOR.values()]
     rules = [b for b in blocks if b not in faces and b not in modes]
     assert (len(faces), len(modes), len(rules)) == (
-        len(docs_theme._FONT_FACES),
+        len(_web.FACES),
         2,
         len(docs_theme._RULES),
     )
@@ -105,7 +106,7 @@ def test_stylesheet_structure_and_scope():
 def test_mode_block_sets_page_background_and_no_faux_styles(mode):
     blocks = dict(_blocks(docs_theme.documenter_css()))
     body = blocks[docs_theme._MODE_SELECTOR[mode]]
-    assert "background-color: var(--fwl-bg);" in body
+    assert "background-color: var(--fwl-doc-bg);" in body
     assert "font-synthesis: none;" in body
 
 
@@ -124,8 +125,8 @@ def test_admonition_kinds_are_the_ones_documenter_emits():
     assert f"{docs_theme._SCOPE} .admonition {{" in css
     for kind, hue in docs_theme._ADMONITIONS.items():
         rule = css.split(f"{docs_theme._SCOPE} .admonition.is-{kind} {{", 1)[1].split("}", 1)[0]
-        assert f"border-color: var(--fwl-{hue}-fill);" in rule
-        assert f"background-color: var(--fwl-{hue}-wash);" in rule
+        assert f"border-color: var(--fwl-doc-{hue}-fill);" in rule
+        assert f"background-color: var(--fwl-doc-{hue}-wash);" in rule
 
 
 def test_header_names_the_package_and_documenter_versions():
@@ -136,8 +137,8 @@ def test_header_names_the_package_and_documenter_versions():
 
 def test_font_files_named_in_the_stylesheet_ship_with_the_package():
     css = docs_theme.documenter_css()
-    files = re.findall(rf'url\("{docs_theme.FONT_DIR}/([^"]+)"\)', css)
-    assert len(files) == len(docs_theme._FONT_FACES)
+    files = re.findall(rf'url\("{_web.FONT_DIR}/([^"]+)"\)', css)
+    assert len(files) == len(_web.FACES)
     for f in files:
         assert (fvl.fonts_dir() / "woff2" / f).is_file()
 
@@ -146,10 +147,10 @@ def test_install_writes_stylesheet_fonts_and_licence(tmp_path):
     out = docs_theme.install_documenter_theme(tmp_path / "assets")
     assert out == tmp_path / "assets" / "fwl.css"
     assert out.read_text(encoding="utf-8") == docs_theme.documenter_css()
-    fonts = tmp_path / "assets" / docs_theme.FONT_DIR
-    for lic in docs_theme._LICENCES:
+    fonts = tmp_path / "assets" / _web.FONT_DIR
+    for lic in _web.LICENCES:
         assert (fonts / lic).read_bytes() == (fvl.fonts_dir() / lic).read_bytes()
-    for _, file, _, _, _ in docs_theme._FONT_FACES:
+    for _, file, _, _ in _web.FACES:
         assert (fonts / file).read_bytes() == (fvl.fonts_dir() / "woff2" / file).read_bytes()
 
 
@@ -188,7 +189,7 @@ def test_text_safe_takes_the_smallest_step_toward_ink(mode):
     t = docs_theme._tokens(mode)
     moved = 0
     for name, hue in t["hues"].items():
-        steps = [docs_theme._mix(hue, t["ink"], k / 100) for k in range(101)]
+        steps = [_web.mix(hue, t["ink"], k / 100) for k in range(101)]
         k = steps.index(t["safe"][name])
         assert k <= 50, name  # still closer to the palette hue than to ink
         if k:
@@ -206,10 +207,10 @@ def test_link_is_the_role_colour_when_it_already_reads():
 
 def test_greek_comes_from_inter_only_for_greek_code_points():
     faces = re.findall(r"@font-face \{([^}]*)\}", docs_theme.documenter_css())
-    assert len(faces) == len(docs_theme._FONT_FACES)
+    assert len(faces) == len(_web.FACES)
     inter = [f for f in faces if '"Inter"' in f]
     geist = [f for f in faces if '"Geist"' in f]
-    assert len(inter) == 2 and len(geist) == 5
+    assert len(inter) == 4 and len(geist) == 5
     assert all("unicode-range: U+0370-03FF, U+1F00-1FFF;" in f for f in inter)
     assert not any("unicode-range" in f for f in geist)
     assert docs_theme.SANS.startswith('"Geist", "Inter"')

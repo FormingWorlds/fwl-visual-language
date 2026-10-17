@@ -97,12 +97,15 @@ def oklch_to_hex(L, C, h):
 
     Notes
     -----
-    Out-of-gamut colours keep their lightness and hue; the chroma drops in
+    Raises ValueError for a negative or non-finite chroma or a non-finite
+    lightness or hue. Out-of-gamut colours keep their lightness and hue; the chroma drops in
     0.001 steps until all channels lie in [0, 1] within 1e-4. This follows the
     chroma-reduction idea of CSS Color 4 gamut mapping, without its
     just-noticeable-difference shortcut, so a browser can render an
     out-of-gamut ``oklch()`` value up to about one hex step differently.
     """
+    if not all(math.isfinite(v) for v in (L, C, h)):
+        raise ValueError(f"L, C and h must be finite, got {(L, C, h)}")
     if C < 0:
         raise ValueError(f"chroma must be >= 0, got {C}")
     while True:
@@ -131,7 +134,7 @@ def hex_to_rgb(value):
     ValueError
         If the string is not 6 hex digits.
     """
-    h = value.lstrip("#")
+    h = value[1:] if value.startswith("#") else value
     if len(h) != 6 or any(c not in "0123456789abcdefABCDEF" for c in h):
         raise ValueError(f"not a #RRGGBB colour: {value!r}")
     return tuple(int(h[i : i + 2], 16) / 255 for i in (0, 2, 4))
@@ -210,7 +213,10 @@ def ramp(name):
     KeyError
         If the ramp does not exist.
     """
-    steps = tokens()["ramps"][name]["steps"]
+    ramps = tokens()["ramps"]
+    if name not in ramps:
+        raise KeyError(f"no ramp {name!r}; ramps: {', '.join(ramps)}")
+    steps = ramps[name]["steps"]
     out = {}
     for step, value in steps.items():
         lch = _step_oklch(name, step)
@@ -235,6 +241,8 @@ def color(ref):
     ------
     KeyError
         If the ramp or step does not exist.
+    ValueError
+        If a literal is not ``#RRGGBB``.
     """
     if ref.startswith("#"):
         hex_to_rgb(ref)
@@ -300,10 +308,17 @@ def palette(mode="paper"):
     Returns
     -------
     list of tuple
-        ``(name, hex)`` pairs in cycle order; colour 1 is signal, colour 2 magma.
+        ``(name, hex)`` pairs in cycle order. Colour 1 is signal and colour 2
+        magma, both as ramp steps; the token file may give any entry as a ramp
+        step or a hex value.
+
+    Raises
+    ------
+    ValueError
+        If the mode is unknown.
     """
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     p = tokens()["palette"]
     key = "dark" if mode == "dark" else "light"
-    return list(zip(p["names"], [h.upper() for h in p[key]], strict=True))
+    return list(zip(p["names"], [color(h) for h in p[key]], strict=True))
