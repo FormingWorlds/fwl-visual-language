@@ -182,7 +182,11 @@ def test_font_stack_quotes_names_and_drops_duplicates():
 
 
 def test_style_colour_map_resolves_once_cmcrameri_is_imported(tmp_path):
-    import cmcrameri  # noqa: F401
+    import cmcrameri.cm as cmc
+    import numpy as np
 
     rc = _load("paper", tmp_path)
-    assert mpl.colormaps[rc["image.cmap"]].name == rc["image.cmap"] == "cmc.batlow"
+    assert rc["image.cmap"] == "cmc.batlow"
+    # compare colours, not names: cmcrameri 1.7 names the registered map "batlow"
+    x = np.linspace(0, 1, 16)
+    np.testing.assert_array_equal(mpl.colormaps[rc["image.cmap"]](x), cmc.batlow(x))
