@@ -25,8 +25,8 @@
   --fwl-magma-500: #DF6C32;
   --fwl-magma-600: #B74B21;
   --fwl-magma-700: #812E19;
-  --fwl-font-text: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
-  --fwl-font-math: "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --fwl-font-text: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --fwl-font-math: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --fwl-font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
   --fwl-background: #010305;
   --fwl-surface: #03090F;

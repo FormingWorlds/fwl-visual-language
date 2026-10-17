@@ -18,7 +18,7 @@ their licences::
 import argparse
 
 from . import __version__, oklch_css, palette, ramp, roles, tokens
-from ._web import font_faces_css, font_stack, install
+from ._web import FONT_DIR, font_faces_css, font_stack, install
 
 __all__ = ["install_web_fonts", "tailwind_theme_css", "tokens_css", "web_fonts_css"]
 
@@ -99,16 +99,23 @@ def tailwind_theme_css():
     )
 
 
-def web_fonts_css():
+def web_fonts_css(font_dir=FONT_DIR):
     """Return ``@font-face`` rules for self-hosting the lab fonts.
+
+    Parameters
+    ----------
+    font_dir : str
+        URL path of the folder with the ``woff2`` files, relative to the stylesheet.
 
     Returns
     -------
     str
-        One rule per bundled web font, with the files in ``fwl-fonts/`` next to
-        the stylesheet. Inter is limited to Greek, which Geist lacks.
+        One rule per bundled web font. Inter is loaded in full, so the math role
+        (``--fwl-font-math``) renders Latin and Greek; text in Geist takes only
+        Greek from it.
     """
-    return _HEADER.format(what="web fonts", version=__version__) + "\n" + font_faces_css()
+    faces = font_faces_css(font_dir, greek_only_math=False)
+    return _HEADER.format(what="web fonts", version=__version__) + "\n" + faces
 
 
 def install_web_fonts(dest):

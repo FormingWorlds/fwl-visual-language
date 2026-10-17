@@ -71,12 +71,28 @@ def test_oklch_to_hex_rejects_negative_chroma():
 
 
 @pytest.mark.parametrize(
-    "args", [(0.5, math.nan, 0), (0.5, math.inf, 0), (math.nan, 0.1, 0), (0.5, 0.1, math.inf)]
+    "args, match",
+    [
+        ((0.5, math.nan, 0), "finite"),
+        ((0.5, math.inf, 0), "finite"),
+        ((math.nan, 0.1, 0), "finite"),
+        ((0.5, 0.1, math.inf), "finite"),
+        ((0.5, 1e6, 0), "chroma"),
+        ((0.5, 0.51, 0), "chroma"),
+        ((1.2, 0.1, 0), "lightness"),
+        ((-0.1, 0.1, 0), "lightness"),
+    ],
 )
-def test_oklch_to_hex_rejects_non_finite_input(args):
-    # NaN or infinite chroma would never leave the chroma-reduction loop
-    with pytest.raises(ValueError, match="finite"):
+def test_oklch_to_hex_rejects_input_the_loop_cannot_finish(args, match):
+    # the chroma loop steps by 0.001: NaN, inf or a huge chroma would not finish
+    with pytest.raises(ValueError, match=match):
         fvl.oklch_to_hex(*args)
+
+
+def test_oklch_to_hex_accepts_the_bounds():
+    assert fvl.oklch_to_hex(1.0, 0.0, 0) == "#FFFFFF"
+    assert fvl.oklch_to_hex(0.0, 0.0, 0) == "#000000"
+    assert fvl.oklch_to_hex(0.7, 0.5, 30).startswith("#")
 
 
 def test_oklch_css_matches_website_form():

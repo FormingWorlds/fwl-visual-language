@@ -1,4 +1,4 @@
-"""Build command, committed dist folder, and the LaTeX package."""
+"""Build command, committed themes folder, and the LaTeX package."""
 
 import re
 import runpy
@@ -13,11 +13,11 @@ import fwl_visual_language as fvl
 from fwl_visual_language import __main__ as cli
 from fwl_visual_language import latex
 
-DIST = Path(__file__).resolve().parents[1] / "dist"
+THEMES = Path(__file__).resolve().parents[1] / "themes"
 
 
 def test_committed_dist_is_current():
-    assert cli.check(DIST) == [], "run: python -m fwl_visual_language build"
+    assert cli.check(THEMES) == [], "run: python -m fwl_visual_language build"
 
 
 @pytest.mark.parametrize("rel", [r for r in cli.OUTPUTS if r.endswith(".css")])
@@ -29,6 +29,18 @@ def test_css_outputs_have_balanced_braces(rel):
         depth += {"{": 1, "}": -1}.get(ch, 0)
         assert depth >= 0, rel
     assert depth == 0, rel
+
+
+def test_check_ignores_dotfiles_and_caches_but_not_under_a_hidden_parent(tmp_path):
+    root = tmp_path / ".hidden" / "themes"
+    cli.build(root)
+    (root / ".DS_Store").write_text("finder")
+    (root / "css" / "__pycache__").mkdir()
+    (root / "css" / "__pycache__" / "x.pyc").write_text("cache")
+    assert cli.check(root) == []
+    # a real extra file below a hidden parent folder must still be reported
+    (root / "css" / "old-name.css").write_text("left behind")
+    assert cli.check(root) == ["css/old-name.css"]
 
 
 def test_build_then_check_round_trip(tmp_path):
@@ -136,7 +148,7 @@ def test_document_compiles_and_embeds_only_geist(tmp_path):
     assert run.returncode == 0, run.stdout[-2000:]
     log = (tmp_path / "doc.log").read_text(errors="replace")
     assert "Missing character" not in log
-    assert "Font shape" not in log, re.findall(r"Font shape.*", log)
+    assert "LaTeX Font Warning" not in log, re.findall(r"LaTeX Font Warning.*", log)
     fonts = subprocess.run(
         ["pdffonts", "doc.pdf"], cwd=tmp_path, capture_output=True, text=True
     ).stdout

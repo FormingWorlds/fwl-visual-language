@@ -28,7 +28,7 @@ jobs:
           ruff check .
           ruff format --check .
       - name: Generated files match the tokens
-        run: python -m fwl_visual_language check dist
+        run: python -m fwl_visual_language check
       - name: Test with coverage
         run: pytest -q --cov --cov-report=term-missing --cov-fail-under=90
 
@@ -43,13 +43,13 @@ jobs:
       - name: Build the wheel
         run: |
           pip install build
-          python -m build --wheel --outdir wheelhouse .
+          python -m build --wheel .
       - name: Install the wheel with the oldest supported test dependencies
-        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" colorspacious pytest wheelhouse/*.whl
+        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" colorspacious pytest dist/*.whl
       - name: Run the tests against the installed package
         run: |
           mkdir ../wheeltest
-          cp -R tests dist ../wheeltest/
+          cp -R tests themes ../wheeltest/
           cd ../wheeltest
           python -c "import fwl_visual_language as f, sys; assert 'site-packages' in f.__file__, f.__file__"
           pytest -q tests

@@ -61,7 +61,6 @@
   src: url("fwl-fonts/Inter-Regular.woff2") format("woff2");
   font-style: normal;
   font-weight: 400;
-  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
@@ -70,7 +69,6 @@
   src: url("fwl-fonts/Inter-Italic.woff2") format("woff2");
   font-style: italic;
   font-weight: 400;
-  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
@@ -79,7 +77,6 @@
   src: url("fwl-fonts/Inter-Medium.woff2") format("woff2");
   font-style: normal;
   font-weight: 500;
-  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }
 
@@ -88,6 +85,5 @@
   src: url("fwl-fonts/Inter-MediumItalic.woff2") format("woff2");
   font-style: italic;
   font-weight: 500;
-  unicode-range: U+0370-03FF, U+1F00-1FFF;
   font-display: swap;
 }

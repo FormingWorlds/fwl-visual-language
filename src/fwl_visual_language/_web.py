@@ -3,16 +3,18 @@
 import shutil
 from pathlib import Path
 
-from . import contrast, fonts_dir, tokens
+from . import contrast, fonts_dir, hex_to_rgb, tokens
 
 FONT_DIR = "fwl-fonts"
 MIN_CONTRAST = 4.5
 GREEK = "U+0370-03FF, U+1F00-1FFF"
 LICENCES = ("OFL-Geist.txt", "OFL-Inter.txt")
-_GENERIC = {"serif", "sans-serif", "monospace", "system-ui", "ui-monospace", "ui-sans-serif"}
+# CSS generic families and BlinkMacSystemFont, which Chrome reads only unquoted
+_BARE = {"serif", "sans-serif", "monospace", "system-ui", "ui-monospace", "ui-sans-serif"}
+_BARE.add("BlinkMacSystemFont")
 
-# (role, file, style, weight). Faces of the math role cover only Greek on pages
-# whose text face is not Inter; the text face has no Greek.
+# (role, file, style, weight). Docs sheets limit the math faces to Greek, which the
+# text face lacks; the standalone web font sheet loads them in full for math text.
 FACES = (
     ("text", "Geist-Regular.woff2", "normal", 400),
     ("text", "Geist-Italic.woff2", "italic", 400),
@@ -29,8 +31,7 @@ FACES = (
 
 
 def _rgb(hex_color):
-    h = hex_color.lstrip("#")
-    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+    return tuple(round(c * 255) for c in hex_to_rgb(hex_color))
 
 
 def _hex(rgb):
@@ -74,7 +75,7 @@ def font_stack(role, extra=()):
     if role == "text":
         names.append(f["math"])
     names = list(dict.fromkeys([*names, *fallback]))
-    return ", ".join(n if n in _GENERIC or n.startswith("-") else f'"{n}"' for n in names)
+    return ", ".join(n if n in _BARE or n.startswith("-") else f'"{n}"' for n in names)
 
 
 def font_faces_css(font_dir=FONT_DIR, greek_only_math=True):

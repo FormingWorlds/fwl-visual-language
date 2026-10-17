@@ -164,7 +164,7 @@ html.theme--documenter-dark {
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) .content {
   background-color: var(--fwl-doc-bg);
   color: var(--fwl-doc-text);
-  font-family: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  font-family: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) button,
@@ -172,7 +172,7 @@ html.theme--documenter-dark {
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) optgroup,
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) select,
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) textarea {
-  font-family: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  font-family: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 :is(html:not([class*="theme--"]), html.theme--documenter-light, html.theme--documenter-dark) .content h1,

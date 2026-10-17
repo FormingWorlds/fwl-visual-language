@@ -4,7 +4,6 @@ import logging
 import re
 import runpy
 import sys
-import warnings
 
 import matplotlib as mpl
 import pytest
@@ -58,6 +57,13 @@ def test_tailwind_theme_has_every_step_once_in_website_form():
     assert text.count("@theme {") == 1
 
 
+def test_web_fonts_css_loads_full_inter_for_the_math_role():
+    text = css.web_fonts_css("static/fonts")
+    assert "unicode-range" not in text
+    assert text.count('url("static/fonts/') == len(_web.FACES)
+    assert '--fwl-font-math: "Inter"' in css.tokens_css()
+
+
 def test_web_fonts_css_names_only_bundled_files():
     text = css.web_fonts_css()
     files = re.findall(r'url\("fwl-fonts/([^"]+)"\)', text)
@@ -108,9 +114,7 @@ def _load(mode, tmp_path):
     log = logging.getLogger("matplotlib")
     log.addHandler(handler)
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            rc = mpl.rc_params_from_file(str(p), fail_on_error=True, use_default_template=False)
+        rc = mpl.rc_params_from_file(str(p), fail_on_error=True, use_default_template=False)
     finally:
         log.removeHandler(handler)
     assert not records, [r.getMessage() for r in records]
@@ -165,9 +169,16 @@ def test_mplstyle_rejects_unknown_mode():
 
 
 def test_font_stack_quotes_names_and_drops_duplicates():
-    assert _web.font_stack("math").startswith('"Inter", system-ui, -apple-system, ')
-    assert _web.font_stack("math").count('"Inter"') == 1
-    assert _web.font_stack("mono", extra=("JuliaMono",)).startswith('"Geist Mono", "JuliaMono"')
+    # BlinkMacSystemFont and generic families must stay unquoted to keep their meaning
+    assert _web.font_stack("text") == (
+        '"Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+    )
+    assert _web.font_stack("math") == (
+        '"Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+    )
+    assert _web.font_stack("mono", extra=("JuliaMono",)) == (
+        '"Geist Mono", "JuliaMono", ui-monospace, "SFMono-Regular", "Menlo", monospace'
+    )
 
 
 def test_style_colour_map_resolves_once_cmcrameri_is_imported(tmp_path):

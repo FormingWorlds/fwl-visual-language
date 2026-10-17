@@ -93,8 +93,8 @@
 }
 
 :root {
-  --pst-font-family-base: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
-  --pst-font-family-heading: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --pst-font-family-base: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --pst-font-family-heading: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --pst-font-family-monospace: "Geist Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
 }
 html {

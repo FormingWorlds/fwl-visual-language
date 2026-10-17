@@ -72,6 +72,13 @@ def test_both_modes_define_every_variable():
         assert set(re.findall(r"(--fwl-doc-[a-z-]+):", block)) == names
 
 
+def test_every_variable_uses_the_doc_prefix():
+    css = docs_theme.documenter_css()
+    used = re.findall(r"var\((--fwl-[a-z-]+)\)", css)
+    defined = re.findall(r"(--fwl-[a-z-]+):", css)
+    assert used and all(n.startswith("--fwl-doc-") for n in used + defined)
+
+
 def test_every_variable_used_is_defined():
     css = docs_theme.documenter_css()
     defined = set(re.findall(r"(--fwl-doc-[a-z-]+):", css))

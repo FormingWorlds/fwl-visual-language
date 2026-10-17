@@ -5,7 +5,7 @@ ramps of the lab website (``ink``, ``signal``, ``magma``) in OKLCH, semantic
 roles for the dark, light and paper themes, the 8-colour figure palette, the
 colour map stops and the font roles. The modules in this package turn the
 tokens into a theme for each medium; ``python -m fwl_visual_language build``
-writes all of them into ``dist/``.
+writes all of them into ``themes/``.
 """
 
 import json
@@ -95,10 +95,15 @@ def oklch_to_hex(L, C, h):
     str
         Upper-case ``#RRGGBB``.
 
+    Raises
+    ------
+    ValueError
+        If a value is not finite, ``L`` lies outside [0, 1] or ``C`` outside
+        [0, 0.5] (sRGB colours stay below a chroma of 0.33).
+
     Notes
     -----
-    Raises ValueError for a negative or non-finite chroma or a non-finite
-    lightness or hue. Out-of-gamut colours keep their lightness and hue; the chroma drops in
+    Out-of-gamut colours keep their lightness and hue; the chroma drops in
     0.001 steps until all channels lie in [0, 1] within 1e-4. This follows the
     chroma-reduction idea of CSS Color 4 gamut mapping, without its
     just-noticeable-difference shortcut, so a browser can render an
@@ -106,8 +111,10 @@ def oklch_to_hex(L, C, h):
     """
     if not all(math.isfinite(v) for v in (L, C, h)):
         raise ValueError(f"L, C and h must be finite, got {(L, C, h)}")
-    if C < 0:
-        raise ValueError(f"chroma must be >= 0, got {C}")
+    if not 0 <= L <= 1:
+        raise ValueError(f"lightness must lie in [0, 1], got {L}")
+    if not 0 <= C <= 0.5:
+        raise ValueError(f"chroma must lie in [0, 0.5], got {C}")
     while True:
         lin = _oklch_to_linear(L, C, h)
         if all(-1e-4 <= v <= 1 + 1e-4 for v in lin) or C <= 0:

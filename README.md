@@ -6,9 +6,9 @@ The tokens start from [formingworlds.space](https://www.formingworlds.space): th
 
 ## What is in it
 
-| File in `dist/` | For | Install |
+| File in `themes/` | For | Install |
 |---|---|---|
-| `css/fwl-tokens.css` | any web page: every colour step and role as a `--fwl-*` variable, dark by default, light (mist ground) with `data-theme="light"` or the visitor's system setting | link it |
+| `css/fwl-tokens.css` | any web page: every colour step and role as a `--fwl-*` variable, dark by default, light (mist ground) with `data-theme="light"` or the visitor's system setting; it names the fonts but loads none, so add `fwl-fonts.css` | link it |
 | `css/fwl-tailwind-theme.css` | the lab website: the Tailwind v4 `@theme` block | import it |
 | `css/fwl-fonts.css` | self-hosted web fonts | `python -m fwl_visual_language.css static/css` |
 | `mpl/fwl-paper.mplstyle`, `mpl/fwl-dark.mplstyle` | matplotlib figures, through [fwl-mpl](https://github.com/FormingWorlds/fwl-mpl) | |
@@ -36,11 +36,11 @@ All `oklch()` steps lie inside sRGB, so every browser and screen shows the same 
 ```bash
 python -m venv .venv
 .venv/bin/pip install -e ".[test]"
-.venv/bin/python -m fwl_visual_language build dist   # regenerate after a token change
+.venv/bin/python -m fwl_visual_language build   # regenerate themes/ after a token change
 .venv/bin/python -m pytest
 ```
 
-`tokens/fwl.json` inside the package is the only source. `python -m fwl_visual_language check dist` fails when a file in `dist/` does not match the tokens or does not belong there. `dist/` holds the generated files, so build a wheel with `python -m build --outdir wheelhouse`.
+`tokens/fwl.json` inside the package is the only source. `python -m fwl_visual_language check` fails when a file in `themes/` does not match the tokens or does not belong there.
 
 ## Licence
 

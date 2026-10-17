@@ -24,7 +24,7 @@
   --color-magma-500: oklch(0.660 0.160 45);
   --color-magma-600: oklch(0.550 0.150 40);
   --color-magma-700: oklch(0.420 0.120 35);
-  --font-sans: "Geist", "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --font-sans: "Geist", "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
-  --font-math: "Inter", system-ui, -apple-system, "BlinkMacSystemFont", sans-serif;
+  --font-math: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
