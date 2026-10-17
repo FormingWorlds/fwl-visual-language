@@ -1,6 +1,7 @@
 """Tests for the token file and the colour helpers."""
 
 import math
+import re
 
 import numpy as np
 import pytest
@@ -25,6 +26,33 @@ def min_delta_e(hexes):
         d = np.linalg.norm(ucs[:, None] - ucs[None], axis=-1)
         worst = min(worst, d[np.triu_indices(len(cols), 1)].min())
     return worst
+
+
+def _oklch(hexv):
+    """OKLCH of a hex colour (Ottosson's sRGB to OKLab matrices), for checks only."""
+    rgb = np.array(fvl.hex_to_rgb(hexv))
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    lms = np.cbrt(
+        np.array(
+            [
+                [0.4122214708, 0.5363325363, 0.0514459929],
+                [0.2119034982, 0.6806995451, 0.1073969566],
+                [0.0883024619, 0.2817188376, 0.6299787005],
+            ]
+        )
+        @ lin
+    )
+    L, a, b = (
+        np.array(
+            [
+                [0.2104542553, 0.7936177850, -0.0040720468],
+                [1.9779984951, -2.4285922050, 0.4505937099],
+                [0.0259040371, 0.7827717662, -0.8086757660],
+            ]
+        )
+        @ lms
+    )
+    return float(L), float(np.hypot(a, b)), float(np.degrees(np.arctan2(b, a)) % 360)
 
 
 def test_website_values_round_trip():
@@ -83,8 +111,9 @@ def test_oklch_to_hex_rejects_negative_chroma():
         ((-0.1, 0.1, 0), "lightness"),
     ],
 )
-def test_oklch_to_hex_rejects_input_the_loop_cannot_finish(args, match):
-    # the chroma loop steps by 0.001: NaN, inf or a huge chroma would not finish
+def test_oklch_to_hex_rejects_out_of_range_input(args, match):
+    # NaN or inf never leaves the 0.001-step chroma loop and a huge chroma takes ~C/0.001
+    # steps; L outside [0, 1] is not a colour
     with pytest.raises(ValueError, match=match):
         fvl.oklch_to_hex(*args)
 
@@ -92,7 +121,15 @@ def test_oklch_to_hex_rejects_input_the_loop_cannot_finish(args, match):
 def test_oklch_to_hex_accepts_the_bounds():
     assert fvl.oklch_to_hex(1.0, 0.0, 0) == "#FFFFFF"
     assert fvl.oklch_to_hex(0.0, 0.0, 0) == "#000000"
-    assert fvl.oklch_to_hex(0.7, 0.5, 30).startswith("#")
+    # at the ends of the lightness range every chroma maps to black or white
+    assert fvl.oklch_to_hex(0.0, fvl.MAX_CHROMA, 30) == "#000000"
+    assert fvl.oklch_to_hex(1.0, fvl.MAX_CHROMA, 30) == "#FFFFFF"
+    # in between, the maximum chroma is pulled into sRGB at the same lightness
+    out = fvl.oklch_to_hex(0.7, fvl.MAX_CHROMA, 30)
+    assert re.fullmatch(r"#[0-9A-F]{6}", out), out
+    L, C, h = _oklch(out)
+    assert L == pytest.approx(0.7, abs=0.004)  # 8-bit rounding
+    assert C > 0.15 and h == pytest.approx(30, abs=3)  # still a strong colour of that hue
 
 
 def test_oklch_css_matches_website_form():

@@ -48,6 +48,19 @@ def build(folder):
     return written
 
 
+_IGNORED_DIRS = {"__pycache__"}
+_IGNORED_FILES = {".DS_Store", "Thumbs.db"}
+
+
+def _is_os_or_cache_file(rel):
+    """Return True for Finder, Windows and Python cache files, judged inside the folder."""
+    return (
+        rel.name in _IGNORED_FILES
+        or rel.name.startswith("._")
+        or any(part in _IGNORED_DIRS for part in rel.parts[:-1])
+    )
+
+
 def check(folder):
     """Return the outputs under ``folder`` that are missing or differ from a fresh build.
 
@@ -61,6 +74,8 @@ def check(folder):
     list of str
         Relative paths that are missing, differ, or are not an output (a file
         left behind by a renamed output); empty when ``folder`` is current.
+        Finder and Windows metadata (``.DS_Store``, ``._*``, ``Thumbs.db``) and
+        ``__pycache__`` folders are ignored.
     """
     folder = Path(folder)
     stale = []
@@ -69,9 +84,8 @@ def check(folder):
         if not path.is_file() or path.read_text(encoding="utf-8", errors="replace") != make():
             stale.append(rel)
     if folder.is_dir():
-        # dotfiles (.DS_Store) and caches are not outputs, judged on the path inside folder
         rels = [p.relative_to(folder) for p in folder.rglob("*") if p.is_file()]
-        extra = {r.as_posix() for r in rels if not any(x.startswith((".", "__")) for x in r.parts)}
+        extra = {r.as_posix() for r in rels if not _is_os_or_cache_file(r)}
         stale += sorted(extra - set(OUTPUTS))
     return stale
 

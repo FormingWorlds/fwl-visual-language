@@ -9,9 +9,23 @@ FONT_DIR = "fwl-fonts"
 MIN_CONTRAST = 4.5
 GREEK = "U+0370-03FF, U+1F00-1FFF"
 LICENCES = ("OFL-Geist.txt", "OFL-Inter.txt")
-# CSS generic families and BlinkMacSystemFont, which Chrome reads only unquoted
-_BARE = {"serif", "sans-serif", "monospace", "system-ui", "ui-monospace", "ui-sans-serif"}
-_BARE.add("BlinkMacSystemFont")
+# CSS generic families stay unquoted (quoted they name a font); BlinkMacSystemFont is
+# written unquoted as in the lab website's own stack
+_BARE = {
+    "serif",
+    "sans-serif",
+    "monospace",
+    "cursive",
+    "fantasy",
+    "math",
+    "emoji",
+    "system-ui",
+    "ui-serif",
+    "ui-sans-serif",
+    "ui-monospace",
+    "ui-rounded",
+    "BlinkMacSystemFont",
+}
 
 # (role, file, style, weight). Docs sheets limit the math faces to Greek, which the
 # text face lacks; the standalone web font sheet loads them in full for math text.
@@ -93,7 +107,14 @@ def font_faces_css(font_dir=FONT_DIR, greek_only_math=True):
     -------
     str
         One rule per face.
+
+    Raises
+    ------
+    ValueError
+        If ``font_dir`` is empty, ends in ``/`` or holds a quote or parenthesis.
     """
+    if not font_dir or font_dir.endswith("/") or any(c in font_dir for c in "\"'()"):
+        raise ValueError(f"font_dir must be a plain relative URL path, got {font_dir!r}")
     family = tokens()["fonts"]
     out = []
     for role, file, style, weight in FACES:

@@ -19,7 +19,6 @@ dependencies = []
 keywords = ["design-tokens", "theme", "matplotlib", "documenter", "sphinx"]
 
 [project.optional-dependencies]
-mpl = ["matplotlib>=3.7", "cmcrameri>=1.7"]
 test = ["pytest>=7", "pytest-cov>=4", "colorspacious>=1.1", "numpy>=1.22", "matplotlib>=3.7", "cmcrameri>=1.7"]
 
 [project.urls]

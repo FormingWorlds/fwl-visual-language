@@ -16,7 +16,7 @@ from fwl_visual_language import latex
 THEMES = Path(__file__).resolve().parents[1] / "themes"
 
 
-def test_committed_dist_is_current():
+def test_committed_themes_are_current():
     assert cli.check(THEMES) == [], "run: python -m fwl_visual_language build"
 
 
@@ -37,10 +37,21 @@ def test_check_ignores_dotfiles_and_caches_but_not_under_a_hidden_parent(tmp_pat
     (root / ".DS_Store").write_text("finder")
     (root / "css" / "__pycache__").mkdir()
     (root / "css" / "__pycache__" / "x.pyc").write_text("cache")
+    (root / "css" / "._fwl-tokens.css").write_text("apple double")
     assert cli.check(root) == []
-    # a real extra file below a hidden parent folder must still be reported
+    # real extra files are reported: below a hidden parent, with a __ or . prefix
     (root / "css" / "old-name.css").write_text("left behind")
-    assert cli.check(root) == ["css/old-name.css"]
+    (root / "css" / "__old.css").write_text("left behind")
+    (root / ".old").mkdir()
+    (root / ".old" / "fwl.css").write_text("left behind")
+    assert cli.check(root) == [".old/fwl.css", "css/__old.css", "css/old-name.css"]
+
+
+def test_main_defaults_to_the_themes_folder(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["build"]) == 0
+    assert (tmp_path / "themes" / "css" / "fwl-tokens.css").is_file()
+    assert cli.main(["check"]) == 0
 
 
 def test_build_then_check_round_trip(tmp_path):

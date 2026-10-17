@@ -105,14 +105,16 @@ def web_fonts_css(font_dir=FONT_DIR):
     Parameters
     ----------
     font_dir : str
-        URL path of the folder with the ``woff2`` files, relative to the stylesheet.
+        URL path of the folder with the ``woff2`` files, relative to the
+        stylesheet, without a trailing ``/``. ``install_web_fonts`` writes them
+        to ``fwl-fonts``.
 
     Returns
     -------
     str
         One rule per bundled web font. Inter is loaded in full, so the math role
-        (``--fwl-font-math``) renders Latin and Greek; text in Geist takes only
-        Greek from it.
+        (``--fwl-font-math``) renders Latin and Greek; text in Geist takes from
+        it any glyph Geist lacks, Greek included.
     """
     faces = font_faces_css(font_dir, greek_only_math=False)
     return _HEADER.format(what="web fonts", version=__version__) + "\n" + faces

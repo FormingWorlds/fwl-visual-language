@@ -33,6 +33,8 @@ __all__ = [
 HERE = Path(__file__).parent
 TOKENS = HERE / "tokens" / "fwl.json"
 MODES = ("dark", "light", "paper")
+# sRGB colours stay below an OKLCH chroma of 0.33; the gamut loop steps chroma by 0.001
+MAX_CHROMA = 0.5
 
 
 @lru_cache(maxsize=1)
@@ -86,7 +88,7 @@ def oklch_to_hex(L, C, h):
     L : float
         OKLab lightness, 0 to 1.
     C : float
-        Chroma, 0 or more.
+        Chroma, 0 to ``MAX_CHROMA`` (0.5).
     h : float
         Hue angle in degrees.
 
@@ -99,7 +101,7 @@ def oklch_to_hex(L, C, h):
     ------
     ValueError
         If a value is not finite, ``L`` lies outside [0, 1] or ``C`` outside
-        [0, 0.5] (sRGB colours stay below a chroma of 0.33).
+        [0, ``MAX_CHROMA``].
 
     Notes
     -----
@@ -113,8 +115,8 @@ def oklch_to_hex(L, C, h):
         raise ValueError(f"L, C and h must be finite, got {(L, C, h)}")
     if not 0 <= L <= 1:
         raise ValueError(f"lightness must lie in [0, 1], got {L}")
-    if not 0 <= C <= 0.5:
-        raise ValueError(f"chroma must lie in [0, 0.5], got {C}")
+    if not 0 <= C <= MAX_CHROMA:
+        raise ValueError(f"chroma must lie in [0, {MAX_CHROMA}], got {C}")
     while True:
         lin = _oklch_to_linear(L, C, h)
         if all(-1e-4 <= v <= 1 + 1e-4 for v in lin) or C <= 0:

@@ -4,6 +4,7 @@ import logging
 import re
 import runpy
 import sys
+import warnings
 
 import matplotlib as mpl
 import pytest
@@ -61,7 +62,17 @@ def test_web_fonts_css_loads_full_inter_for_the_math_role():
     text = css.web_fonts_css("static/fonts")
     assert "unicode-range" not in text
     assert text.count('url("static/fonts/') == len(_web.FACES)
+    assert text.count('font-family: "Inter"') == 4
+
+
+def test_tokens_css_names_inter_for_the_math_role():
     assert '--fwl-font-math: "Inter"' in css.tokens_css()
+
+
+@pytest.mark.parametrize("bad", ["", "fonts/", 'a"b', "a)b"])
+def test_font_dir_must_be_a_plain_relative_path(bad):
+    with pytest.raises(ValueError, match="font_dir"):
+        css.web_fonts_css(bad)
 
 
 def test_web_fonts_css_names_only_bundled_files():
@@ -114,7 +125,11 @@ def _load(mode, tmp_path):
     log = logging.getLogger("matplotlib")
     log.addHandler(handler)
     try:
-        rc = mpl.rc_params_from_file(str(p), fail_on_error=True, use_default_template=False)
+        # a deprecated key warns through warnings; matplotlib 3.7 also emits pyparsing
+        # deprecations, so only matplotlib's own category is turned into an error
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error", category=mpl.MatplotlibDeprecationWarning)
+            rc = mpl.rc_params_from_file(str(p), fail_on_error=True, use_default_template=False)
     finally:
         log.removeHandler(handler)
     assert not records, [r.getMessage() for r in records]
