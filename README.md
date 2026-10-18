@@ -10,6 +10,7 @@ The tokens start from [formingworlds.space](https://www.formingworlds.space): th
 |---|---|---|
 | `css/fwl-tokens.css` | any web page: every colour step and role as a `--fwl-*` variable, dark by default, light (mist ground) with `data-theme="light"` or the visitor's system setting; it names the fonts but loads none, so add `fwl-fonts.css` | link it |
 | `css/fwl-tailwind-theme.css` | the lab website: the Tailwind v4 `@theme` block | import it |
+| `css/fwl-tailwind-light.css` | the lab website: the light theme over the same variables (system setting or `data-theme="light"`), and `.on-dark` for areas that stay dark | import it right after `@import "tailwindcss"` |
 | `css/fwl-fonts.css` | self-hosted web fonts | `python -m fwl_visual_language.css static/css` |
 | `mpl/fwl-paper.mplstyle`, `mpl/fwl-dark.mplstyle` | matplotlib figures, through [fwl-mpl](https://github.com/FormingWorlds/fwl-mpl) | |
 | `documenter/fwl.css` | Documenter.jl sites, light and dark | `python -m fwl_visual_language.documenter docs/src/assets` |
@@ -30,6 +31,8 @@ The figure palette has 8 colours. Colour 1 is signal and colour 2 is magma, the 
 The matplotlib styles set batlow from the [Crameri scientific colour maps](https://www.fabiocrameri.ch/colourmaps/) as the default map; it is registered as `cmc.batlow` once `cmcrameri` is imported. The token file also names the diverging defaults (vik on paper, berlin on dark) and the stops of 2 optional lab maps, ember and tide, for packages that build colour maps.
 
 All `oklch()` steps lie inside sRGB, so every browser and screen shows the same colour.
+
+The website's light theme reassigns the ramp steps instead of changing classes. `website_light` in the token file gives the light value of each step: another step (`"ink-950"`), a hex literal, or an OKLCH list (`[L, C]` on the ramp's hue, or `[L, C, h]`) for a hover step that sits between 2 ramp steps. The light rules are not in a cascade layer, so they win over Tailwind's `@theme` layer wherever the import sits.
 
 ## Develop
 

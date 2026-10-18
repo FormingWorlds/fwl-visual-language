@@ -1,0 +1,91 @@
+/* Forming Worlds Lab website light theme (fwl-visual-language 0.1.0). Generated from the lab tokens; edit tokens/fwl.json, not this file. */
+
+:root {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-ink-0: oklch(0.055 0.010 240);
+    --color-ink-50: oklch(0.090 0.012 240);
+    --color-ink-100: oklch(0.135 0.018 240);
+    --color-ink-200: oklch(0.220 0.022 240);
+    --color-ink-300: oklch(0.320 0.020 240);
+    --color-ink-400: oklch(0.430 0.018 240);
+    --color-ink-500: oklch(0.430 0.018 240);
+    --color-ink-600: oklch(0.555 0.016 240);
+    --color-ink-700: oklch(0.760 0.012 240);
+    --color-ink-800: oklch(0.860 0.010 240);
+    --color-ink-850: oklch(0.940 0.007 240);
+    --color-ink-900: #FFFFFF;
+    --color-ink-950: oklch(0.972 0.005 240);
+    --color-ink-980: #FFFFFF;
+    --color-signal-300: #005B87;
+    --color-signal-400: #003E60;
+    --color-signal-500: #0072A1;
+    --color-signal-600: #003E60;
+    --color-signal-700: #003E60;
+    --color-magma-300: oklch(0.420 0.120 35);
+    --color-magma-400: oklch(0.485 0.135 37);
+    --color-magma-500: oklch(0.550 0.150 40);
+    --color-magma-600: oklch(0.550 0.150 40);
+    --color-magma-700: oklch(0.420 0.120 35);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme="light"] {
+  --color-ink-0: oklch(0.055 0.010 240);
+  --color-ink-50: oklch(0.090 0.012 240);
+  --color-ink-100: oklch(0.135 0.018 240);
+  --color-ink-200: oklch(0.220 0.022 240);
+  --color-ink-300: oklch(0.320 0.020 240);
+  --color-ink-400: oklch(0.430 0.018 240);
+  --color-ink-500: oklch(0.430 0.018 240);
+  --color-ink-600: oklch(0.555 0.016 240);
+  --color-ink-700: oklch(0.760 0.012 240);
+  --color-ink-800: oklch(0.860 0.010 240);
+  --color-ink-850: oklch(0.940 0.007 240);
+  --color-ink-900: #FFFFFF;
+  --color-ink-950: oklch(0.972 0.005 240);
+  --color-ink-980: #FFFFFF;
+  --color-signal-300: #005B87;
+  --color-signal-400: #003E60;
+  --color-signal-500: #0072A1;
+  --color-signal-600: #003E60;
+  --color-signal-700: #003E60;
+  --color-magma-300: oklch(0.420 0.120 35);
+  --color-magma-400: oklch(0.485 0.135 37);
+  --color-magma-500: oklch(0.550 0.150 40);
+  --color-magma-600: oklch(0.550 0.150 40);
+  --color-magma-700: oklch(0.420 0.120 35);
+  color-scheme: light;
+}
+
+.on-dark {
+  --color-ink-0: #FFFFFF;
+  --color-ink-50: oklch(0.972 0.005 240);
+  --color-ink-100: oklch(0.928 0.008 240);
+  --color-ink-200: oklch(0.860 0.010 240);
+  --color-ink-300: oklch(0.760 0.012 240);
+  --color-ink-400: oklch(0.660 0.014 240);
+  --color-ink-500: oklch(0.555 0.016 240);
+  --color-ink-600: oklch(0.430 0.018 240);
+  --color-ink-700: oklch(0.320 0.020 240);
+  --color-ink-800: oklch(0.220 0.022 240);
+  --color-ink-850: oklch(0.170 0.022 240);
+  --color-ink-900: oklch(0.135 0.018 240);
+  --color-ink-950: oklch(0.090 0.012 240);
+  --color-ink-980: oklch(0.055 0.010 240);
+  --color-signal-300: oklch(0.800 0.090 233);
+  --color-signal-400: oklch(0.700 0.110 233);
+  --color-signal-500: #0072A1;
+  --color-signal-600: #005B87;
+  --color-signal-700: #003E60;
+  --color-magma-300: oklch(0.840 0.090 55);
+  --color-magma-400: oklch(0.750 0.135 50);
+  --color-magma-500: oklch(0.660 0.160 45);
+  --color-magma-600: oklch(0.550 0.150 40);
+  --color-magma-700: oklch(0.420 0.120 35);
+  color-scheme: dark;
+}

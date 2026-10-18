@@ -1,5 +1,6 @@
 """Tests for the web stylesheets and the matplotlib style sheets."""
 
+import copy
 import logging
 import re
 import runpy
@@ -56,6 +57,131 @@ def test_tailwind_theme_has_every_step_once_in_website_form():
     assert "--color-ink-950: oklch(0.090 0.012 240);" in text
     assert "--color-signal-500: #0072A1;" in text
     assert text.count("@theme {") == 1
+
+
+def _colour_vars(block):
+    return dict(re.findall(r"(--color-[a-z]+-\d+):\s*([^;]+);", block))
+
+
+def _hex(css_value):
+    m = re.fullmatch(r"oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)", css_value)
+    return fvl.oklch_to_hex(*map(float, m.groups())) if m else css_value
+
+
+def _lightness(css_value):
+    m = re.fullmatch(r"oklch\(([\d.]+) [\d.]+ [\d.]+\)", css_value)
+    if m:
+        return float(m.group(1))
+    lin = [
+        c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        for c in fvl.hex_to_rgb(css_value)
+    ]
+    lms = [
+        sum(w * c for w, c in zip(row, lin, strict=True)) ** (1 / 3)
+        for row in (
+            (0.4122214708, 0.5363325363, 0.0514459929),
+            (0.2119034982, 0.6806995451, 0.1073969566),
+            (0.0883024619, 0.2817188376, 0.6299787005),
+        )
+    ]
+    return 0.2104542553 * lms[0] + 0.7936177850 * lms[1] - 0.0040720468 * lms[2]
+
+
+def test_lightness_helper_reads_both_forms():
+    assert _lightness("oklch(0.485 0.135 37)") == 0.485
+    assert abs(_lightness("#0072A1") - 0.522) < 2e-3
+    assert abs(_lightness("#FFFFFF") - 1.0) < 1e-6
+
+
+def test_tailwind_light_overrides_every_theme_variable_and_on_dark_restores_it():
+    text = css.tailwind_light_css()
+    theme = _colour_vars(css.tailwind_theme_css())
+    media = _colour_vars(_block(text, ':root:not([data-theme="dark"]) {'))
+    explicit = _colour_vars(_block(text, ':root[data-theme="light"] {'))
+    on_dark = _colour_vars(_block(text, ".on-dark {"))
+    assert media == explicit
+    n_steps = sum(len(r["steps"]) for r in fvl.tokens()["ramps"].values())
+    assert set(media) == set(theme) and len(theme) == n_steps
+    assert on_dark == theme
+    assert "color-scheme: dark;" in _block(text, ".on-dark {")
+    assert text.count("color-scheme: light;") == 2
+    assert ":root {\n  color-scheme: dark;\n}" in text
+    assert "@media (prefers-color-scheme: light) {" in text
+
+
+def test_tailwind_light_values_follow_the_token_table():
+    light = _colour_vars(_block(css.tailwind_light_css(), ':root[data-theme="light"] {'))
+    assert light["--color-ink-0"] == "oklch(0.055 0.010 240)"  # a ramp reference
+    assert light["--color-ink-900"] == "#FFFFFF"  # a reference to a hex step
+    assert light["--color-ink-850"] == "oklch(0.940 0.007 240)"  # L, C with the ramp hue
+    assert light["--color-magma-400"] == "oklch(0.485 0.135 37)"  # L, C, h
+    assert light["--color-signal-300"] == "#005B87"
+
+
+@pytest.mark.parametrize("mode", ["light", "dark"])
+def test_website_hover_steps_differ_and_white_text_reads_on_filled_buttons(mode):
+    text = css.tailwind_light_css()
+    opener = ':root[data-theme="light"] {' if mode == "light" else ".on-dark {"
+    raw = {k.removeprefix("--color-"): x for k, x in _colour_vars(_block(text, opener)).items()}
+    v = {k: _hex(x) for k, x in raw.items()}
+    # base and hover step of the dropdown, the filled buttons and the warm ghost text
+    pairs = [("ink-900", "ink-850"), ("signal-500", "signal-600"), ("magma-600", "magma-700")]
+    for base, hover in [*pairs, ("magma-400", "magma-300")]:
+        # a visible step: 0.03 in OKLCH lightness (the dark dropdown hover is 0.035)
+        assert abs(_lightness(raw[base]) - _lightness(raw[hover])) >= 0.03, (mode, base, hover)
+    for fill in ("signal-500", "signal-600", "magma-600", "magma-700"):
+        assert fvl.contrast("#FFFFFF", v[fill]) >= 4.5, (mode, fill)
+
+
+def test_tailwind_light_takes_a_literal_hex_in_upper_case(monkeypatch):
+    table = copy.deepcopy(fvl.tokens()["website_light"])
+    table["ink"]["980"] = "#fafbfc"
+    monkeypatch.setitem(fvl.tokens(), "website_light", table)
+    light = _colour_vars(_block(css.tailwind_light_css(), ':root[data-theme="light"] {'))
+    assert light["--color-ink-980"] == "#FAFBFC"
+
+
+def _drop(table, ramp_name, step):
+    del table[ramp_name][step]
+
+
+@pytest.mark.parametrize(
+    ("edit", "error", "match"),
+    [
+        (lambda t: _drop(t, "ink", "850"), KeyError, r"website_light\.ink: missing \['850'\]"),
+        (lambda t: t["ink"].update({"990": "ink-0"}), KeyError, r"unknown \['990'\]"),
+        (lambda t: t.pop("magma"), KeyError, "website_light ramps"),
+        (lambda t: t.update({"signl": {}}), KeyError, "website_light ramps"),
+        (lambda t: t["magma"].update({"500": "magma-999"}), KeyError, r"magma\.500: .*999"),
+        (lambda t: t["signal"].update({"300": "#12"}), ValueError, r"signal\.300: .*#12"),
+        (lambda t: t["magma"].update({"400": [0.5, 0.1]}), ValueError, r"magma\.400: expected"),
+        (lambda t: t["ink"].update({"850": [0.94]}), ValueError, "expected"),
+        (lambda t: t["ink"].update({"850": [0.94, 0.007, 240, 1]}), ValueError, "expected"),
+        (lambda t: t["ink"].update({"850": [0.94, "0.007"]}), ValueError, "expected"),
+        (lambda t: t["ink"].update({"850": [True, 0.007]}), ValueError, "expected"),
+        (lambda t: t["ink"].update({"850": [float("nan"), 0.007]}), ValueError, "expected"),
+        (lambda t: t["ink"].update({"850": [1.4, 0.007]}), ValueError, r"L must lie in \[0, 1\]"),
+        (lambda t: t["ink"].update({"850": [0.9, -0.01]}), ValueError, "C in"),
+        (lambda t: t["ink"].update({"850": None}), ValueError, "expected a ramp step"),
+    ],
+)
+def test_tailwind_light_rejects_a_bad_token_table(monkeypatch, edit, error, match):
+    table = copy.deepcopy(fvl.tokens()["website_light"])
+    edit(table)
+    monkeypatch.setitem(fvl.tokens(), "website_light", table)
+    with pytest.raises(error, match=match):
+        css.tailwind_light_css()
+
+
+def test_website_light_departs_from_the_light_roles_only_where_listed():
+    # the website keeps its own steps for these roles; any other difference is a drift
+    t = fvl.tokens()
+    differ = set()
+    for role, dark_ref in t["roles"]["dark"].items():
+        name, _, step = dark_ref.partition("-")
+        if t["website_light"][name][step] != t["roles"]["light"][role]:
+            differ.add(role)
+    assert differ == {"heading", "line", "axis", "note", "warning"}
 
 
 def test_web_fonts_css_loads_full_inter_for_the_math_role():

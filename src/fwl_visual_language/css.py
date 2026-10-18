@@ -7,7 +7,9 @@ system prefers light and the page sets no ``data-theme``.
 
 ``tailwind_theme_css`` gives the ``@theme`` block that the lab website builds
 its utility classes from (``bg-ink-950``, ``text-signal-300``), in the same
-``oklch()`` form the site uses.
+``oklch()`` form the site uses. ``tailwind_light_css`` gives the website's light
+theme: the same variables reassigned to light values (``website_light`` in the
+token file), and ``.on-dark`` for areas that keep the dark ramp.
 
 ``install_web_fonts`` writes ``fwl-fonts.css`` with the ``woff2`` files and
 their licences::
@@ -16,11 +18,18 @@ their licences::
 """
 
 import argparse
+import math
 
-from . import __version__, oklch_css, palette, ramp, roles, tokens
+from . import MAX_CHROMA, __version__, _oklch_text, color, oklch_css, palette, ramp, roles, tokens
 from ._web import FONT_DIR, font_faces_css, font_stack, install
 
-__all__ = ["install_web_fonts", "tailwind_theme_css", "tokens_css", "web_fonts_css"]
+__all__ = [
+    "install_web_fonts",
+    "tailwind_light_css",
+    "tailwind_theme_css",
+    "tokens_css",
+    "web_fonts_css",
+]
 
 FONTS_CSS_NAME = "fwl-fonts.css"
 _HEADER = (
@@ -96,6 +105,95 @@ def tailwind_theme_css():
         + "@theme {\n"
         + "\n".join(lines)
         + "\n}\n"
+    )
+
+
+def _is_number(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x)
+
+
+def _light_value(name, step):
+    """Return the website's light value of one ramp step in CSS form."""
+    t = tokens()
+    where = f"website_light.{name}.{step}"
+    value = t["website_light"][name][step]
+    if isinstance(value, list):
+        hue = t["ramps"][name]["hue"]
+        if len(value) == 2:
+            value = [*value, hue]
+        if len(value) != 3 or not all(_is_number(x) for x in value):
+            raise ValueError(f"{where}: expected [L, C] on a ramp with a hue, or [L, C, h]")
+        L, C, h = value
+        if not (0 <= L <= 1 and 0 <= C <= MAX_CHROMA):
+            raise ValueError(f"{where}: L must lie in [0, 1] and C in [0, {MAX_CHROMA}]")
+        return _oklch_text(L, C, h)
+    if not isinstance(value, str):
+        raise ValueError(f"{where}: expected a ramp step, #RRGGBB or an OKLCH list")
+    try:
+        color(value)  # an unknown ramp or step raises KeyError, a malformed hex ValueError
+    except (KeyError, ValueError) as err:
+        raise type(err)(f"{where}: {err}") from err
+    if value.startswith("#"):
+        return value.upper()
+    ref_ramp, _, ref_step = value.partition("-")
+    return oklch_css(ref_ramp, ref_step)
+
+
+def tailwind_light_css():
+    """Return the light theme of the lab website, over the Tailwind ``@theme`` variables.
+
+    Returns
+    -------
+    str
+        CSS text: ``color-scheme: dark`` on ``:root``; every ``--color-<ramp>-<step>``
+        reassigned to its light value under ``prefers-color-scheme: light`` (unless
+        the page sets ``data-theme="dark"``) and under ``data-theme="light"``; and
+        ``.on-dark``, which restores the dark values for its subtree.
+
+    Raises
+    ------
+    KeyError
+        If ``website_light`` and the ramps differ in their ramps or steps, or a
+        value names an unknown ramp step.
+    ValueError
+        If a value is not a ramp step, a ``#RRGGBB`` literal, or an ``[L, C]``
+        (ramp with a hue) or ``[L, C, h]`` list with L in [0, 1] and C in
+        [0, ``MAX_CHROMA``].
+
+    Notes
+    -----
+    ``website_light`` follows the website's classes, so a few steps differ from
+    what the light roles give for the same dark step (heading, line, axis, note,
+    warning); ``tests/test_css_mpl.py`` lists them.
+    """
+    t = tokens()
+    table = t["website_light"]
+    if set(table) != set(t["ramps"]):
+        raise KeyError(f"website_light ramps {sorted(table)} differ from {sorted(t['ramps'])}")
+    light, dark = [], []
+    for name in t["ramps"]:
+        steps = t["ramps"][name]["steps"]
+        if set(table[name]) != set(steps):
+            missing, extra = set(steps) - set(table[name]), set(table[name]) - set(steps)
+            raise KeyError(
+                f"website_light.{name}: missing {sorted(missing)}, unknown {sorted(extra)}"
+            )
+        for step in steps:
+            var = f"--color-{name}-{step}"
+            light.append(f"{var}: {_light_value(name, step)};")
+            dark.append(f"  {var}: {oklch_css(name, step)};")
+    light.append("color-scheme: light;")
+    dark.append("  color-scheme: dark;")
+    return "\n".join(
+        [
+            _HEADER.format(what="website light theme", version=__version__),
+            ":root {\n  color-scheme: dark;\n}\n",
+            '@media (prefers-color-scheme: light) {\n  :root:not([data-theme="dark"]) {\n'
+            + "\n".join("    " + x for x in light)
+            + "\n  }\n}\n",
+            ':root[data-theme="light"] {\n' + "\n".join("  " + x for x in light) + "\n}\n",
+            ".on-dark {\n" + "\n".join(dark) + "\n}\n",
+        ]
     )
 
 

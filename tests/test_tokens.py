@@ -75,6 +75,20 @@ def test_every_oklch_step_lies_inside_srgb(name):
         assert all(-1e-4 <= v <= 1 + 1e-4 for v in lin), (name, step, lin)
 
 
+def test_every_oklch_value_of_the_website_light_theme_lies_inside_srgb():
+    t = fvl.tokens()
+    literals = [
+        (name, step, [*v, t["ramps"][name]["hue"]][:3])
+        for name, steps in t["website_light"].items()
+        for step, v in steps.items()
+        if isinstance(v, list)
+    ]
+    assert literals
+    for name, step, lch in literals:
+        lin = _oklch_to_linear(*lch)
+        assert all(-1e-4 <= v <= 1 + 1e-4 for v in lin), (name, step, lin)
+
+
 def test_gamut_test_catches_an_out_of_gamut_step():
     lin = _oklch_to_linear(0.44, 0.115, 233)
     assert not all(-1e-4 <= v <= 1 + 1e-4 for v in lin)

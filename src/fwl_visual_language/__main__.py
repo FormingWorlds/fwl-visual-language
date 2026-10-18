@@ -16,6 +16,7 @@ __all__ = ["OUTPUTS", "build", "check", "main"]
 OUTPUTS = {
     "css/fwl-tokens.css": css.tokens_css,
     "css/fwl-tailwind-theme.css": css.tailwind_theme_css,
+    "css/fwl-tailwind-light.css": css.tailwind_light_css,
     "css/fwl-fonts.css": css.web_fonts_css,
     "mpl/fwl-paper.mplstyle": lambda: mpl.mplstyle("paper"),
     "mpl/fwl-dark.mplstyle": lambda: mpl.mplstyle("dark"),
