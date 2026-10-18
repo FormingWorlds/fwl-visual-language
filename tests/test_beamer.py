@@ -27,6 +27,12 @@ BIB = r"""
   title = {E}}
 @article{others, author = {Zeta, Zoe and others}, year = {2022}, journal = {\mnras}, title = {F}}
 @misc{anon, title = {G}, year = {in press}, journal = {PSJ}}
+@article{s1, author = {Smith, Sam}, year = {2025}, journal = {PSJ}, title = {S1}}
+@article{s2, author = {Smith, Sam}, year = {2025}, journal = {PSJ}, title = {S2}}
+@article{suffix, author = {Jones, Jo}, year = {2024a}, journal = {PSJ}, title = {J}}
+@misc{source, title = {K}, journal = {Only Source}}
+@article{aa, author = {Eta, Eli and Theta, Tom}, year = {2021},
+  journal = {Astronomy \& Astrophysics}, title = {H}}
 """
 
 TALK = r"""\documentclass[aspectratio=169]{beamer}
@@ -43,9 +49,9 @@ TALK = r"""\documentclass[aspectratio=169]{beamer}
   \slideref{two}
   \slideref{book,many}[right]
 \end{frame}
-\begin{frame}{More cases}\slideref{prefix,others}\slideref{anon,nokey}[right]\end{frame}
+\begin{frame}{More cases}\slideref{prefix,others,aa}\slideref{anon,nokey}[right]\end{frame}
 \begin{frame}[plain]{A plain frame}\slideref{one}\end{frame}
-\begin{frame}{After the plain frame}Text.\end{frame}
+\begin{frame}{After the plain frame}Text.\slideref{s1,s2,suffix,source}\end{frame}
 \begin{frame}[statement]{On ink-980}\slideref{many}\end{frame}
 \statementframe{A common assumption.}
 \closingframe[Positions]{A closing question?}
@@ -156,14 +162,18 @@ def test_talk_compiles_with_references_in_both_corners(tmp_path):
     # the left corner and the right stack are on the same base line
     lines = [ln for ln in pages[4].splitlines() if ln.strip()]
     assert "Alpha & Beta 24" in lines[-1] and "Gamma+ 25 ApJL" in lines[-1]
-    # ink-950 on every frame, ink-980 only on the statement frames (6 and 7)
     more = re.sub(r"\s+", " ", pages[5])
     assert "van Eylen 24 A&A" in more  # the prefix stays; journal mapped
     assert "Zeta+ 22 MNRAS" in more  # "and others" gives "+"; ADS macro
     assert "in press PSJ" in more and "+ in press" not in more  # no author, year kept
     assert "nokey" in more  # an unknown key shows, not silently dropped
+    assert "Eta & Theta 21 A&A" in more  # a long journal name with \\& is mapped
     # a reference in a plain frame does not move to the next frame
     assert "Alpha 23" not in pages[7]
+    after = [ln.strip() for ln in pages[7].splitlines() if ln.strip()]
+    # one author, one year: the letter tells the papers apart; a suffixed year keeps it
+    for line in ("Smith 25a PSJ", "Smith 25b PSJ", "Jones 24a PSJ", "Only Source"):
+        assert line in after, (line, after)
     # ink-950 on every frame, ink-980 only on the statement frames
     ink = fvl.ramp("ink")
     ink950, ink980 = (tuple(int(ink[s][i : i + 2], 16) for i in (1, 3, 5)) for s in ("950", "980"))

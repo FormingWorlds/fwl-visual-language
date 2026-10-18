@@ -176,7 +176,9 @@ def proposal_sty(release=None):
             "\\NeedsTeXFormat{LaTeX2e}",
             f"\\ProvidesPackage{{fwlproposal}}[{release:%Y/%m/%d} v{__version__} "
             "Forming Worlds Lab]",
-            "\\@ifpackageloaded{fwl}{\\fwlusemath}{\\RequirePackage[math]{fwl}}",
+            "\\@ifpackageloaded{fwl}{\\@ifpackagelater{fwl}{2026/10/18}{}%",
+            "  {\\PackageError{fwlproposal}{fwl.sty is older than this style}{Reinstall.}}%",
+            "  \\fwlusemath}{\\RequirePackage[math]{fwl}[2026/10/18]}",
             "\\RequirePackage[a4paper,margin=2cm]{geometry}",
             "\\RequirePackage{titlesec}",
             "\\RequirePackage{caption}",

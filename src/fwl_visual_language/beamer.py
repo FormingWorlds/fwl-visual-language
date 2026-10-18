@@ -28,7 +28,9 @@ ASSET_DIR = "fwl-assets"
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
 _LOGO = "fwl-logo-white.png"
 
-_BODY = r"""\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
+_BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/18}{}%
+  {\PackageError{beamerthemefwl}{fwl.sty is older than this theme}{Install both again.}}%
+  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/18]}
 \RequirePackage{tikz}
 \RequirePackage{xstring}
 \RequirePackage{etoolbox}
@@ -54,9 +56,9 @@ _BODY = r"""\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
 \setbeamercolor{item}{fg=fwlMagma400}
 \setbeamerfont{normal text}{size=\fwlsize{34}}
 \setbeamertemplate{itemize items}{\raisebox{0.15ex}{\small$\blacktriangleright$}}
-% Key words in magma-400; \hl only when no other package (soul) defines it
+% Key words in magma-400; \hl only when the preamble (for example soul) defines none
 \newcommand{\fwlhl}[1]{\textcolor{fwlMagma400}{#1}}
-\providecommand{\hl}{\fwlhl}
+\AtBeginDocument{\providecommand{\hl}{\fwlhl}}
 
 % Grounds: ink-950; the [statement] frame option uses ink-980.
 \newif\iffwl@statement
@@ -106,7 +108,8 @@ _BODY = r"""\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
 \fwljournal{Annu. Rev. Astron. Astrophys.}{ARA\&A}
 \fwljournal{Geochim. Cosmochim. Acta}{GCA}
 \fwljournal{J. Open Source Softw.}{JOSS}
-% ADS journal macros, defined only where the document has none
+% ADS journal macros, at \begin{document} and only where the preamble defines none
+\AtBeginDocument{%
 \providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
 \providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
 \providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
@@ -117,26 +120,29 @@ _BODY = r"""\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
 \providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
 \providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
 \providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
-\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}
+\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}}
 
-% "Teske+ 25 ApJL": 1 or 2 family names (with a prefix such as "van"), else the first plus "+"
-% (also for "and others"); the last 2 digits of a numeric year; the journal in italics.
+% "Teske+ 25 ApJL": 1 or 2 family names, always with a prefix such as "van", else the first
+% plus "+" (also for "and others"); a 2-digit year with the letter that tells papers of one
+% author and year apart (25a, 25b); the journal in italics.
 \DeclareNameFormat{fwlfamily}{%
   \ifdefvoid{\namepartprefix}{}{\namepartprefix\addspace}\namepartfamily
   \ifthenelse{\value{listcount}<\value{liststop}}{\addspace\&\addspace}{}}
-\DeclareFieldFormat{fwlyy}{\IfInteger{#1}{\StrRight{#1}{2}}{#1}}
+% A year that starts with 4 digits keeps its last 2 and any suffix (2024a gives 24a)
+\DeclareFieldFormat{fwlyy}{\StrLeft{#1}{4}[\fwl@yfour]%
+  \IfInteger{\fwl@yfour}{\StrRight{\fwl@yfour}{2}\StrGobbleLeft{#1}{4}}{#1}}
 \newbibmacro{fwl:source}{%
   \iffieldundef{journaltitle}%
-    {\iffieldundef{booktitle}{}{\addspace\mkbibemph{\printfield[noformat]{booktitle}}}}%
-    {\addspace\protected@edef\fwl@tmp{\thefield{journaltitle}}%
-     \mkbibemph{\expandafter\fwl@journal\expandafter{\fwl@tmp}}}}
+    {\setunit{\addspace}\printfield[emph]{booktitle}}%
+    {\protected@edef\fwl@tmp{\thefield{journaltitle}}%
+     \setunit{\addspace}\printtext[emph]{\expandafter\fwl@journal\expandafter{\fwl@tmp}}}}
 \DeclareCiteCommand{\fwlcite}{}%
   {\ifnameundef{labelname}{}%
      {\ifboolexpr{test {\ifnumgreater{\value{labelname}}{2}} or test {\ifandothers{labelname}}}%
         {\printnames[fwlfamily][1-1]{labelname}+}%
         {\printnames[fwlfamily]{labelname}}%
       \setunit{\addspace}}%
-   \printfield[fwlyy]{year}\usebibmacro{fwl:source}}%
+   \printfield[fwlyy]{year}\printfield{extradate}\usebibmacro{fwl:source}}%
   {\par}{}
 
 \newcommand{\fwl@refbox}[2]{% #1 alignment, #2 content

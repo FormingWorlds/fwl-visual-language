@@ -1,7 +1,9 @@
 % Forming Worlds Lab proposal and report style (fwl-visual-language 0.2.0). Generated; edit the generator, not this file.
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesPackage{fwlproposal}[2026/10/18 v0.2.0 Forming Worlds Lab]
-\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
+\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/18}{}%
+  {\PackageError{fwlproposal}{fwl.sty is older than this style}{Reinstall.}}%
+  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/18]}
 \RequirePackage[a4paper,margin=2cm]{geometry}
 \RequirePackage{titlesec}
 \RequirePackage{caption}

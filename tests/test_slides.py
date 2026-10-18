@@ -158,7 +158,7 @@ def test_samples_have_no_personal_content(built):
         sh.text_frame.text for lay in prs.slide_layouts for sh in lay.shapes if sh.has_text_frame
     )
     assert "SPEAKER NAME" in text and "Venue, city" in text
-    assert not re.search(r"Tim Lichtenberg|TIM LICHTENBERG|Leuven", text)
+    assert not re.search(r"\bTim\b|TIM LICHTENBERG|Leuven", text)
 
 
 def test_more_layouts_than_the_base_template_has_are_refused(tmp_path, monkeypatch):
@@ -239,12 +239,44 @@ def test_a_missing_python_pptx_names_the_extra(tmp_path, monkeypatch):
 
 def test_a_bad_figure_is_refused_before_the_build(tmp_path):
     (tmp_path / "text.png").write_text("not an image")
-    for bad in (tmp_path / "missing.png", tmp_path / "text.png"):
+    Image.new("RGB", (40, 30), (255, 0, 0)).save(tmp_path / "ok.png")
+    data = bytearray((tmp_path / "ok.png").read_bytes())
+    data[data.index(b"IDAT") + 6] ^= 0xFF  # a byte of the pixel data
+    (tmp_path / "flipped.png").write_bytes(bytes(data))
+    (tmp_path / "half.png").write_bytes(bytes(data[: len(data) // 2]))
+    for bad in ("missing.png", "text.png", "flipped.png", "half.png"):
         with pytest.raises(ValueError, match="cannot read the figure"):
-            slides.build_slides(tmp_path / "x.pptx", figure=bad)
+            slides.build_slides(tmp_path / "x.pptx", figure=tmp_path / bad)
+    Image.new("RGB", (40, 30)).save(tmp_path / "fig.webp")
+    with pytest.raises(ValueError, match="is WEBP"):
+        slides.build_slides(tmp_path / "x.pptx", figure=tmp_path / "fig.webp")
     assert not (tmp_path / "x.pptx").exists()
+    assert slides.build_slides(tmp_path / "x.pptx", figure=tmp_path / "ok.png").is_file()
 
 
 def test_missing_output_folders_are_created(tmp_path):
     out = slides.build_slides(tmp_path / "a" / "b" / "x.pptx")
     assert out.is_file()
+
+
+def test_master_body_levels_and_the_free_bottom_corners(built):
+    prs = Presentation(built["keynote"])
+    master = prs.slide_master.element.xml
+    body = re.search(r"<p:bodyStyle>(.*?)</p:bodyStyle>", master, re.S).group(1)
+    for n in range(1, 6):
+        level = re.search(rf"<a:lvl{n}pPr[^>]*>(.*?)</a:lvl{n}pPr>", body, re.S).group(1)
+        assert '<a:buChar char="•"/>' in level and 'typeface="Geist"' in level, n
+    title_style = re.search(r"<p:titleStyle>(.*?)</p:titleStyle>", master, re.S).group(1)
+    assert 'typeface="Geist Light"' in title_style
+    # date and footer sit at the top, away from the reference corners
+    for ph in prs.slide_master.placeholders:
+        if ph.placeholder_format.type in (PP_PLACEHOLDER.DATE, PP_PLACEHOLDER.FOOTER):
+            assert ph.top + ph.height <= 40 * EMU, ph.name
+    # the master and the layouts share the title and slide-number boxes
+    title = prs.slide_master.placeholders[0]
+    figure_title = prs.slide_layouts[slides.LAYOUTS.index("Figure")].placeholders[0]
+    assert (title.left, title.top, title.width) == (
+        figure_title.left,
+        figure_title.top,
+        figure_title.width,
+    )

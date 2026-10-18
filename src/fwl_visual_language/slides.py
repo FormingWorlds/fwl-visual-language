@@ -53,6 +53,10 @@ MAGMA400 = ramp("magma")["400"][1:]
 DARK = {name: hexv[1:] for name, hexv in palette("dark")}
 WHITE = "FFFFFF"
 REF_PT, REF_W, REF_H, EDGE = 24, 900, 220, 28
+# Title and slide-number boxes, shared by the master and the layouts
+TITLE_BOX, NUMBER_BOX = (64, 40, 1792, 90), (16, 10, 120, 24)
+# Picture formats python-pptx places
+FIGURE_FORMATS = {"PNG", "JPEG", "GIF", "BMP", "TIFF"}
 REF_PROMPT = [[("Author+ YY ", False), ("Journal", True)]]
 # Figure boxes of the layouts, in design points: (x, y, width, height)
 BOX = {
@@ -238,7 +242,7 @@ def _layouts(g, figures):
         )
 
     def number(lay):
-        lay.ph("number", 30, "Slide number", (16, 10, 120, 24), 16, INK["400"], "")
+        lay.ph("number", 30, "Slide number", NUMBER_BOX, 16, INK["400"], "")
 
     def logo(lay, x=1720, y=930, h=100):
         w = h * 36.75 / 20.25
@@ -252,7 +256,7 @@ def _layouts(g, figures):
             "title",
             0,
             "Title",
-            (64, 40, 1792, 90),
+            TITLE_BOX,
             72,
             WHITE,
             "Title states the finding in one line",
@@ -620,13 +624,14 @@ def _master(master, g):
     clr = el.find(f"{p_ns}clrMap")
     clr.attrib.update({"bg1": "dk1", "tx1": "lt1", "bg2": "dk2", "tx2": "lt2"})
     boxes = {
-        "TITLE": (64, 40, 1792, 90),
+        "TITLE": TITLE_BOX,
         "BODY": (64, 190, 1792, 790),
-        "DATE": (EDGE, 1040, 400, 24),
-        "FOOTER": (660, 1040, 600, 24),
-        "SLIDE_NUMBER": (16, 10, 120, 24),
+        "DATE": (1660, 10, 232, 24),
+        "FOOTER": (1200, 10, 440, 24),
+        "SLIDE_NUMBER": NUMBER_BOX,
     }
-    for ph in master.placeholders:
+    # a placeholder type this design does not place keeps its position
+    for ph in (p for p in master.placeholders if p.placeholder_format.type.name in boxes):
         x, y, w, h = boxes[ph.placeholder_format.type.name]
         ph.left, ph.top, ph.width, ph.height = (Emu(g.e(v)) for v in (x, y, w, h))
 
@@ -675,7 +680,9 @@ def build_slides(out, keynote=False, figure=None):
     ImportError
         If ``python-pptx`` is not installed; the message names the ``slides`` extra.
     ValueError
-        If ``figure`` cannot be read as an image.
+        If ``figure`` is not a PNG, JPEG, GIF, BMP or TIFF file that can be read.
+    RuntimeError
+        If the python-pptx base template has fewer layouts than :data:`LAYOUTS`.
     """
     try:
         from pptx import Presentation
@@ -686,13 +693,16 @@ def build_slides(out, keynote=False, figure=None):
             'the slide masters need python-pptx: pip install "fwl-visual-language[slides]"'
         ) from err
     if figure is not None:
-        from PIL import Image, UnidentifiedImageError
+        from PIL import Image
 
         try:
             with Image.open(figure) as im:
-                im.verify()
-        except (OSError, UnidentifiedImageError) as err:
+                kind = im.format
+                im.load()  # decodes the whole image; verify() skips most formats
+        except Exception as err:  # Pillow raises OSError, SyntaxError, ValueError, ...
             raise ValueError(f"cannot read the figure {figure}: {err}") from err
+        if kind not in FIGURE_FORMATS:
+            raise ValueError(f"the figure {figure} is {kind}; use one of {sorted(FIGURE_FORMATS)}")
 
     g = _Geo(1.0 if keynote else 0.5)
     prs = Presentation()

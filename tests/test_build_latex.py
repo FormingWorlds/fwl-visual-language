@@ -189,7 +189,13 @@ def test_proposal_style_is_an_output_and_loads_the_math_option():
 def test_math_option_is_off_unless_asked():
     text = latex.sty()
     assert "\\DeclareOption{math}{\\fwl@mathtrue}" in text
-    assert text.index("\\iffwl@math") < text.index("\\RequirePackage{unicode-math}")
+    assert "\\iffwl@math\\fwlusemath\\fi" in text
+    # unicode-math is loaded only inside \\fwlusemath, which works in the preamble only
+    body = text[
+        text.index("\\newcommand{\\fwlusemath}") : text.index("\\@onlypreamble\\fwlusemath")
+    ]
+    assert "\\RequirePackage{unicode-math}" in body
+    assert text.count("\\RequirePackage{unicode-math}") == 1
 
 
 def test_install_latex_copies_the_math_fonts_and_proposal_style(tmp_path):
@@ -235,7 +241,7 @@ def test_proposal_compiles_with_inter_and_stix_math(tmp_path):
         "Text $\\phi \\approx 0.4$, $\\Delta\\log f\\mathrm{O_2}$, $1\\,M_\\oplus$, "
         "$\\symbf{x}\\,\\symbf{\\alpha}\\,\\symbfit{\\beta}$ and "
         "\\[ \\frac{\\partial S}{\\partial t} = \\sum_i \\alpha_i \\int_0^R \\Phi(r)\\,dr \\]"
-        "\\begin{figure}[h]\\caption{Caption.}\\end{figure}\\end{document}\n"
+        "\\begin{figure}[h]\\caption{Caption.}\\end{figure}\\newpage Page two.\\end{document}\n"
     )
     names = _lualatex(tmp_path, "p")
     assert {
@@ -265,3 +271,25 @@ def test_proposal_compiles_with_inter_and_stix_math(tmp_path):
     # the footer is on every page, also on the \\maketitle page in the plain style
     pages = [p for p in text.split("\f") if p.strip()]
     assert all("Lab footer" in p for p in pages), len(pages)
+
+
+@pytest.mark.skipif(not (shutil.which("lualatex") and shutil.which("pdffonts")), reason="no TeX")
+def test_math_loads_once_and_only_in_the_preamble(tmp_path):
+    latex.install_latex(tmp_path)
+    (tmp_path / "a.tex").write_text(
+        "\\documentclass{article}\\usepackage[math]{fwl}\\usepackage{fwlproposal}\\fwlusemath"
+        "\\begin{document}$\\phi$\\end{document}\n"
+    )
+    assert "Inter-Italic" in _lualatex(tmp_path, "a")
+    (tmp_path / "b.tex").write_text(
+        "\\documentclass{article}\\usepackage{fwl}\\begin{document}\\fwlusemath x\\end{document}\n"
+    )
+    run = subprocess.run(
+        ["lualatex", "-interaction=nonstopmode", "-halt-on-error", "b.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert run.returncode != 0
+    assert "Can be used only in preamble" in (tmp_path / "b.log").read_text(errors="replace")
