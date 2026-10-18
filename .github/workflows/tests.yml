@@ -45,7 +45,7 @@ jobs:
           pip install build
           python -m build --wheel .
       - name: Install the wheel with the oldest supported test dependencies
-        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" colorspacious pytest dist/*.whl
+        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" "python-pptx==1.0.*" colorspacious pytest dist/*.whl
       - name: Run the tests against the installed package
         run: |
           mkdir ../wheeltest
@@ -55,7 +55,7 @@ jobs:
           pytest -q tests
 
   latex:
-    name: Compile a document with the LaTeX package
+    name: Compile documents and a talk with the LaTeX packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,11 +65,15 @@ jobs:
       - name: Install TeX and poppler
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends texlive-luatex texlive-latex-recommended poppler-utils
+          sudo apt-get install -y --no-install-recommends texlive-luatex texlive-latex-recommended \
+            texlive-latex-extra texlive-bibtex-extra poppler-utils
       - name: Install
         run: pip install -e ".[test]"
-      - name: Compile and check the embedded fonts (fails if the test is skipped)
+      - name: Compile and check the embedded fonts (fails if a test is skipped)
         run: |
           set -o pipefail
-          pytest -rs tests/test_build_latex.py::test_document_compiles_and_embeds_only_geist | tee out.txt
-          grep -q "1 passed" out.txt
+          pytest -rs tests/test_build_latex.py::test_document_compiles_and_embeds_only_geist \
+            tests/test_build_latex.py::test_proposal_compiles_with_inter_and_stix_math \
+            tests/test_beamer.py::test_talk_compiles_with_references_in_both_corners \
+            tests/test_beamer.py::test_talk_embeds_the_lab_fonts | tee out.txt
+          grep -q "5 passed" out.txt

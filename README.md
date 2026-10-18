@@ -2,7 +2,7 @@
 
 Visual identity of the Forming Worlds Lab: one set of design tokens and the themes generated from it for the website, figures, documentation and documents.
 
-The tokens start from [formingworlds.space](https://www.formingworlds.space): the cool `ink` neutrals, the logo blue `signal` (`#0072A1`) and the warm `magma` accent. Words are set in [Geist](https://github.com/vercel/geist-font); math symbols and Greek letters, which Geist does not have, in [Inter](https://github.com/rsms/inter); code in Geist Mono.
+The tokens start from [formingworlds.space](https://www.formingworlds.space): the cool `ink` neutrals, the logo blue `signal` (`#0072A1`) and the warm `magma` accent. Words are set in [Geist](https://github.com/vercel/geist-font); math symbols and Greek letters, which Geist does not have, in [Inter](https://github.com/rsms/inter); code in Geist Mono. In LaTeX, math letters, digits and Greek come from Inter and operators, delimiters and large symbols from [STIX Two Math](https://github.com/stipub/stixfonts).
 
 ## What is in it
 
@@ -15,7 +15,9 @@ The tokens start from [formingworlds.space](https://www.formingworlds.space): th
 | `mpl/fwl-paper.mplstyle`, `mpl/fwl-dark.mplstyle` | matplotlib figures, through [fwl-mpl](https://github.com/FormingWorlds/fwl-mpl) | |
 | `documenter/fwl.css` | Documenter.jl sites, light and dark | `python -m fwl_visual_language.documenter docs/src/assets` |
 | `jupyterbook/fwl-jupyterbook.css` | Jupyter Book 1 (sphinx-book-theme), light and dark | `python -m fwl_visual_language.jupyterbook book/_static` |
-| `latex/fwl.sty` | letters, proposals and the CV with LuaLaTeX or XeLaTeX | `python -m fwl_visual_language.latex path/to/document` |
+| `latex/fwl.sty` | colours and fonts for letters, proposals and the CV with LuaLaTeX or XeLaTeX; `\usepackage[math]{fwl}` adds the Inter and STIX Two math | `python -m fwl_visual_language.latex path/to/document` |
+| `latex/fwlproposal.sty` | page style of proposals and reports: A4 with 2 cm margins, numbered headings, captions, links, footer (`\fwltitle{title}{subtitle}`, `\renewcommand{\fwlfooter}{...}`); loads `fwl` with `math` | same command |
+| `beamer/beamerthemefwl.sty` | LaTeX talks (`\usetheme{fwl}`), LuaLaTeX and BibTeX | `python -m fwl_visual_language.beamer path/to/talk` |
 
 The install commands copy the fonts and their licences next to the stylesheet or package. The Documenter.jl and Jupyter Book themes keep the stock layouts and change only colours and type. For Documenter.jl, add `"assets/fwl.css"` to `Documenter.HTML(; assets=[...])`; Jupyter Book 1 picks up every stylesheet in `_static` by itself.
 
@@ -34,6 +36,22 @@ All `oklch()` steps lie inside sRGB, so every browser and screen shows the same 
 
 The website's light theme reassigns the ramp steps instead of changing classes. `website_light` in the token file gives the light value of each step: another step (`"ink-950"`), a hex literal, or an OKLCH list (`[L, C]` on the ramp's hue, or `[L, C, h]`) for a hover step that sits between 2 ramp steps. The light rules are not in a cascade layer, so they win over Tailwind's `@theme` layer wherever the import sits.
 
+## Slides
+
+The slide masters exist as a PowerPoint file, a Keynote theme and a beamer theme with the same 10 layouts: Title, Question, Section, Figure, Figure large, Two figures, Summary, Statement, Team and Closing. Every slide sits on the ink-950 ground (statements on ink-980) and takes figures in the dark figure style; the masters have no background picture, so a talk can add its own. Titles are one line of Geist Light. Key words take magma-400.
+
+Every content layout has 2 reference boxes, bottom left and bottom right, in 24 pt on the 1920 x 1080 design. A box is anchored at its base, so several references stack upward and never run off the slide. The format is `Teske+ 25 ApJL`: 1 or 2 family names (`Lichtenberg & Miguel 25`), else the first plus `+`, a 2-digit year and the journal in italics.
+
+```bash
+pip install "fwl-visual-language[slides]"
+python -m fwl_visual_language.slides "Forming Worlds.pptx"                   # PowerPoint, Google Slides
+python -m fwl_visual_language.slides fwl-keynote-source.pptx --keynote      # Keynote source
+```
+
+The PowerPoint file is 13.333 x 7.5 in; its figure boxes are content placeholders, not picture placeholders, and Google Slides uses the same file. The Keynote source is 1920 x 1080 pt without figure boxes, because Keynote removes them on import. Open it in Keynote and save it; Keynote turns the layouts into master slides, and a copy of the saved file with the extension `.kth` is the theme: Keynote makes a new presentation with all 10 masters from it. Geist and Inter must be installed on the computer for Keynote and PowerPoint.
+
+In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom left corner and `\slideref{key}[right]` in the bottom right one; one call can take several keys. `\fwljournal{name in the .bib}{name on the slide}` adds a journal name to the list that maps, for example, `Mon. Not. R. Astron. Soc.` to `MNRAS`. The frames are `\titleframe`, `\questionframe[sub-question]{question}`, `\sectionframe{label}{statement}`, `\figureframe{title}{side text}{image}`, `\statementframe{text}`, `\closingframe[announcement]{statement}`, plain frames, and `[statement]` frames on ink-980. Compile with `lualatex`, `bibtex`, then `lualatex` twice.
+
 ## Develop
 
 ```bash
@@ -47,4 +65,4 @@ python -m venv .venv
 
 ## Licence
 
-Code and tokens: Apache 2.0. Geist, Geist Mono and Inter: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`.
+Code and tokens: Apache 2.0. Geist, Geist Mono, Inter and STIX Two Math: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`. The logo in `src/fwl_visual_language/assets/` is the mark of the Forming Worlds Lab, as on formingworlds.space.

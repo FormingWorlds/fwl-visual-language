@@ -13,10 +13,11 @@ import math
 from functools import lru_cache
 from pathlib import Path
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "MODES",
+    "assets_dir",
     "color",
     "contrast",
     "fonts_dir",
@@ -51,15 +52,27 @@ def tokens():
 
 
 def fonts_dir():
-    """Return the folder that holds the bundled fonts (``ttf/`` and ``woff2/``).
+    """Return the folder that holds the bundled fonts (``ttf/``, ``otf/`` and ``woff2/``).
 
     Returns
     -------
     pathlib.Path
-        Folder with the unmodified Geist, Geist Mono and Inter files and their
-        licences.
+        Folder with the unmodified Geist, Geist Mono, Inter and STIX Two Math
+        files and their licences.
     """
     return HERE / "fonts"
+
+
+def assets_dir():
+    """Return the folder that holds the lab logo (``fwl-logo-white.svg`` and ``.png``).
+
+    Returns
+    -------
+    pathlib.Path
+        Folder with the white logo of formingworlds.space and a 1200 px wide
+        rendering of it for slides.
+    """
+    return HERE / "assets"
 
 
 def _oklch_to_linear(L, C, h):
