@@ -65,4 +65,4 @@ python -m venv .venv
 
 ## Licence
 
-Code and tokens: Apache 2.0. Geist, Geist Mono, Inter and STIX Two Math: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`. The logo in `src/fwl_visual_language/assets/` is the mark of the Forming Worlds Lab, as on formingworlds.space.
+Code and tokens: Apache 2.0. Geist, Geist Mono, Inter and STIX Two Math: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`. The logo in `src/fwl_visual_language/assets/` is the mark of the Forming Worlds Lab, as on formingworlds.space. It is not covered by the Apache 2.0 or OFL licences of this repository; use it only for material of the Forming Worlds Lab.
