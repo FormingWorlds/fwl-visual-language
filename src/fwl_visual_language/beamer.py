@@ -28,7 +28,7 @@ ASSET_DIR = "fwl-assets"
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
 _LOGO = "fwl-logo-white.png"
 
-_BODY = r"""\RequirePackage[math]{fwl}
+_BODY = r"""\@ifpackageloaded{fwl}{\fwlusemath}{\RequirePackage[math]{fwl}}
 \RequirePackage{tikz}
 \RequirePackage{xstring}
 \RequirePackage{etoolbox}
@@ -54,14 +54,16 @@ _BODY = r"""\RequirePackage[math]{fwl}
 \setbeamercolor{item}{fg=fwlMagma400}
 \setbeamerfont{normal text}{size=\fwlsize{34}}
 \setbeamertemplate{itemize items}{\raisebox{0.15ex}{\small$\blacktriangleright$}}
-\newcommand{\hl}[1]{\textcolor{fwlMagma400}{#1}}
+% Key words in magma-400; \hl only when no other package (soul) defines it
+\newcommand{\fwlhl}[1]{\textcolor{fwlMagma400}{#1}}
+\providecommand{\hl}{\fwlhl}
 
 % Grounds: ink-950; the [statement] frame option uses ink-980.
 \newif\iffwl@statement
 \newif\iffwl@titlepage
 \define@key{beamerframe}{statement}[true]{\global\fwl@statementtrue}
 % The ground holds for every overlay of a frame and resets at the next frame.
-\BeforeBeginEnvironment{frame}{\global\fwl@statementfalse}
+\BeforeBeginEnvironment{frame}{\global\fwl@statementfalse\gdef\fwl@refl{}\gdef\fwl@refr{}}
 \setbeamertemplate{background canvas}{%
   \iffwl@statement
     \textcolor{fwlInk980}{\rule{\paperwidth}{\paperheight}}%
@@ -104,26 +106,37 @@ _BODY = r"""\RequirePackage[math]{fwl}
 \fwljournal{Annu. Rev. Astron. Astrophys.}{ARA\&A}
 \fwljournal{Geochim. Cosmochim. Acta}{GCA}
 \fwljournal{J. Open Source Softw.}{JOSS}
-% ADS journal macros
-\providecommand{\mnras}{MNRAS}\providecommand{\apj}{ApJ}\providecommand{\apjl}{ApJL}
-\providecommand{\apjs}{ApJS}\providecommand{\aj}{AJ}\providecommand{\aap}{A\&A}
-\providecommand{\nat}{Nature}\providecommand{\icarus}{Icarus}\providecommand{\araa}{ARA\&A}
-\providecommand{\psj}{PSJ}\providecommand{\jgr}{JGR}\providecommand{\pasp}{PASP}
+% ADS journal macros, defined only where the document has none
+\providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
+\providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
+\providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
+\providecommand{\baas}{BAAS}\providecommand{\icarus}{Icarus}\providecommand{\jcap}{JCAP}
+\providecommand{\jgr}{JGR}\providecommand{\grl}{GRL}\providecommand{\gca}{GCA}
+\providecommand{\jqsrt}{JQSRT}\providecommand{\mnras}{MNRAS}\providecommand{\nat}{Nature}
+\providecommand{\na}{New Astron.}\providecommand{\pasa}{PASA}\providecommand{\pasj}{PASJ}
+\providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
+\providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
+\providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
+\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}
 
-% "Teske+ 25 ApJL": 1 or 2 family names, else the first plus "+"; 2-digit year; journal in italics.
+% "Teske+ 25 ApJL": 1 or 2 family names (with a prefix such as "van"), else the first plus "+"
+% (also for "and others"); the last 2 digits of a numeric year; the journal in italics.
 \DeclareNameFormat{fwlfamily}{%
-  \namepartfamily\ifthenelse{\value{listcount}<\value{liststop}}{\addspace\&\addspace}{}}
-\DeclareFieldFormat{fwlyy}{\StrRight{#1}{2}}
+  \ifdefvoid{\namepartprefix}{}{\namepartprefix\addspace}\namepartfamily
+  \ifthenelse{\value{listcount}<\value{liststop}}{\addspace\&\addspace}{}}
+\DeclareFieldFormat{fwlyy}{\IfInteger{#1}{\StrRight{#1}{2}}{#1}}
 \newbibmacro{fwl:source}{%
   \iffieldundef{journaltitle}%
     {\iffieldundef{booktitle}{}{\addspace\mkbibemph{\printfield[noformat]{booktitle}}}}%
-    {\addspace\edef\fwl@tmp{\thefield{journaltitle}}%
+    {\addspace\protected@edef\fwl@tmp{\thefield{journaltitle}}%
      \mkbibemph{\expandafter\fwl@journal\expandafter{\fwl@tmp}}}}
 \DeclareCiteCommand{\fwlcite}{}%
-  {\ifnumgreater{\value{labelname}}{2}%
-     {\printnames[fwlfamily][1-1]{labelname}+}%
-     {\printnames[fwlfamily]{labelname}}%
-   \addspace\printfield[fwlyy]{year}\usebibmacro{fwl:source}}%
+  {\ifnameundef{labelname}{}%
+     {\ifboolexpr{test {\ifnumgreater{\value{labelname}}{2}} or test {\ifandothers{labelname}}}%
+        {\printnames[fwlfamily][1-1]{labelname}+}%
+        {\printnames[fwlfamily]{labelname}}%
+      \setunit{\addspace}}%
+   \printfield[fwlyy]{year}\usebibmacro{fwl:source}}%
   {\par}{}
 
 \newcommand{\fwl@refbox}[2]{% #1 alignment, #2 content

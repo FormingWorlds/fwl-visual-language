@@ -2,9 +2,10 @@
 
 ``fwl.sty`` defines every ramp step, the paper roles and the figure palette as
 ``xcolor`` colours, and sets Geist as the document face with Geist Mono for
-code, through ``fontspec`` (LuaLaTeX or XeLaTeX). With the ``math`` option it
-loads ``unicode-math``: letters, digits and Greek in math come from Inter (Geist
-has no Greek), operators, delimiters and large symbols from STIX Two Math.
+code, through ``fontspec`` (LuaLaTeX or XeLaTeX). With the ``math`` option (or
+``\\fwlusemath`` in the preamble) it loads ``unicode-math``: letters, digits and
+Greek in math come from Inter (Geist has no Greek), operators, delimiters and
+large symbols from STIX Two Math.
 ``fwlproposal.sty`` loads ``fwl`` with ``math`` and sets the page, headings,
 captions, links and footer of proposals and reports.
 
@@ -38,6 +39,8 @@ _TTF = (
     "GeistMono-Medium.ttf",
     "Inter-Regular.ttf",
     "Inter-Italic.ttf",
+    "Inter-Medium.ttf",
+    "Inter-MediumItalic.ttf",
 )
 _LICENCES = ("OFL-Geist.txt", "OFL-Inter.txt", "OFL-STIX.txt")
 # Bold is SemiBold (600) upright and italic; \fwlmedium selects Medium (500).
@@ -81,7 +84,7 @@ def sty(release=None):
     Parameters
     ----------
     release : datetime.date, optional
-        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-17 so the
+        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-18 so the
         generated file does not change from day to day.
 
     Returns
@@ -89,7 +92,7 @@ def sty(release=None):
     str
         LaTeX package source.
     """
-    release = release or date(2026, 10, 17)
+    release = release or date(2026, 10, 18)
     fonts = tokens()["fonts"]
     lines = [
         "% Forming Worlds Lab LaTeX package (fwl-visual-language "
@@ -123,16 +126,23 @@ def sty(release=None):
         "  FontFace={md}{n}{GeistMono-Medium.ttf}]",
         "\\newcommand{\\fwlmedium}{\\fontseries{md}\\selectfont}",
         "",
-        f"% Math (option math): letters, digits and Greek from {fonts['math']},",
-        "% everything else from STIX Two",
-        "\\iffwl@math",
+        f"% Math: letters, digits and Greek from {fonts['math']} (Medium for bold), everything",
+        "% else from STIX Two. The math option or \\fwlusemath in the preamble loads it once.",
+        "\\newif\\iffwl@mathdone",
+        "\\newcommand{\\fwlusemath}{\\iffwl@mathdone\\else\\global\\fwl@mathdonetrue",
         "  \\RequirePackage{unicode-math}",
         f"  \\setmathfont{{{MATH_FONT}}}[Path=\\fwlfontpath]",
         "  \\setmathfont{Inter-Regular.ttf}[Path=\\fwlfontpath,",
         "    range={up/{latin,Latin,num,greek,Greek}}]",
         "  \\setmathfont{Inter-Italic.ttf}[Path=\\fwlfontpath,",
         "    range={it/{latin,Latin,greek,Greek}}]",
-        "\\fi",
+        "  \\setmathfont{Inter-Medium.ttf}[Path=\\fwlfontpath,",
+        "    range={bfup/{latin,Latin,num,greek,Greek}}]",
+        "  \\setmathfont{Inter-MediumItalic.ttf}[Path=\\fwlfontpath,",
+        "    range={bfit/{latin,Latin,greek,Greek}}]",
+        "\\fi}",
+        "\\@onlypreamble\\fwlusemath",
+        "\\iffwl@math\\fwlusemath\\fi",
         "\\color{fwlText}",
         "\\endinput",
         "",
@@ -151,12 +161,14 @@ def proposal_sty(release=None):
     Returns
     -------
     str
-        LaTeX package source. It loads ``fwl`` with the ``math`` option, A4
+        LaTeX package source. It loads ``fwl`` with the ``math`` option (or
+        runs ``\\fwlusemath`` when ``fwl`` is already loaded), A4
         pages with 2 cm margins, numbered Geist Medium headings with the number
         in the accent colour, muted captions, lab-coloured links and a footer
-        with ``\\fwlfooter`` on the left and the page number on the right.
+        with ``\\fwlfooter`` on the left and the page number on the right, also
+        on pages in the ``plain`` style.
     """
-    release = release or date(2026, 10, 17)
+    release = release or date(2026, 10, 18)
     return "\n".join(
         [
             "% Forming Worlds Lab proposal and report style (fwl-visual-language "
@@ -164,7 +176,7 @@ def proposal_sty(release=None):
             "\\NeedsTeXFormat{LaTeX2e}",
             f"\\ProvidesPackage{{fwlproposal}}[{release:%Y/%m/%d} v{__version__} "
             "Forming Worlds Lab]",
-            "\\RequirePackage[math]{fwl}",
+            "\\@ifpackageloaded{fwl}{\\fwlusemath}{\\RequirePackage[math]{fwl}}",
             "\\RequirePackage[a4paper,margin=2cm]{geometry}",
             "\\RequirePackage{titlesec}",
             "\\RequirePackage{caption}",
@@ -184,8 +196,11 @@ def proposal_sty(release=None):
             "\\titleformat{\\subsection}{\\fwlmedium\\normalsize\\color{fwlHeading}}"
             "{\\textcolor{fwlAccent}{\\thesubsection}}{0.6em}{}",
             "\\titleformat{\\paragraph}[runin]{\\fwlmedium\\color{fwlHeading}}{}{0pt}{}[.]",
+            "\\titleformat{\\subsubsection}{\\fwlmedium\\normalsize\\color{fwlMuted}}"
+            "{\\textcolor{fwlAccent}{\\thesubsubsection}}{0.6em}{}",
             "\\titlespacing*{\\section}{0pt}{1.1em}{0.35em}",
             "\\titlespacing*{\\subsection}{0pt}{0.9em}{0.25em}",
+            "\\titlespacing*{\\subsubsection}{0pt}{0.7em}{0.2em}",
             "\\titlespacing*{\\paragraph}{0pt}{0.5em}{0.5em}",
             "",
             "% Captions: label in the heading colour, text muted",
@@ -207,6 +222,9 @@ def proposal_sty(release=None):
             "\\renewcommand{\\headrulewidth}{0pt}",
             "\\fancyfoot[L]{\\ttfamily\\footnotesize\\color{fwlMuted}\\fwlfooter}",
             "\\fancyfoot[R]{\\ttfamily\\footnotesize\\color{fwlMuted}\\thepage}",
+            "\\fancypagestyle{plain}{\\fancyhf{}\\renewcommand{\\headrulewidth}{0pt}%",
+            "  \\fancyfoot[L]{\\ttfamily\\footnotesize\\color{fwlMuted}\\fwlfooter}%",
+            "  \\fancyfoot[R]{\\ttfamily\\footnotesize\\color{fwlMuted}\\thepage}}",
             "\\endinput",
             "",
         ]

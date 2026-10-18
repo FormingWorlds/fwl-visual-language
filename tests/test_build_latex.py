@@ -226,11 +226,14 @@ def _lualatex(folder, name):
 @pytest.mark.skipif(not (shutil.which("lualatex") and shutil.which("pdffonts")), reason="no TeX")
 def test_proposal_compiles_with_inter_and_stix_math(tmp_path):
     latex.install_latex(tmp_path)
+    # fwl loaded first, as a letter would do: the proposal style adds the math to it
     (tmp_path / "p.tex").write_text(
-        "\\documentclass[11pt]{article}\\usepackage{fwlproposal}"
-        "\\renewcommand{\\fwlfooter}{Footer}\\begin{document}\\fwltitle{Title}{Subtitle}"
-        "\\section{Section}\\subsection{Sub}\\paragraph{Run-in} Text $\\phi \\approx 0.4$, "
-        "$\\Delta\\log f\\mathrm{O_2}$, $1\\,M_\\oplus$ and "
+        "\\documentclass[11pt]{article}\\usepackage{fwl}\\usepackage{fwlproposal}"
+        "\\usepackage{amsmath}\\renewcommand{\\fwlfooter}{Lab footer}\\title{T}\\author{A}"
+        "\\begin{document}\\maketitle\\fwltitle{Title line}{Subtitle line}"
+        "\\section{Section}\\subsection{Sub}\\subsubsection{Subsub}\\paragraph{Run-in} "
+        "Text $\\phi \\approx 0.4$, $\\Delta\\log f\\mathrm{O_2}$, $1\\,M_\\oplus$, "
+        "$\\symbf{x}\\,\\symbf{\\alpha}\\,\\symbfit{\\beta}$ and "
         "\\[ \\frac{\\partial S}{\\partial t} = \\sum_i \\alpha_i \\int_0^R \\Phi(r)\\,dr \\]"
         "\\begin{figure}[h]\\caption{Caption.}\\end{figure}\\end{document}\n"
     )
@@ -238,9 +241,27 @@ def test_proposal_compiles_with_inter_and_stix_math(tmp_path):
     assert {
         "Inter-Regular",
         "Inter-Italic",
+        "Inter-Medium",
+        "Inter-MediumItalic",
         "STIXTwoMath-Regular",
         "Geist-Regular",
         "Geist-Medium",
         "GeistMono-Regular",
     } <= names
     assert not {n for n in names if not n.startswith(("Geist", "Inter", "STIXTwoMath"))}
+    text = subprocess.run(
+        ["pdftotext", "-layout", "p.pdf", "-"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout
+    for expected in (
+        "Title line",
+        "Subtitle line",
+        "1 Section",
+        "1.1 Sub",
+        "1.1.1 Subsub",
+        "Run-in.",
+        "Figure 1. Caption.",
+    ):
+        assert expected in text, expected
+    # the footer is on every page, also on the \\maketitle page in the plain style
+    pages = [p for p in text.split("\f") if p.strip()]
+    assert all("Lab footer" in p for p in pages), len(pages)

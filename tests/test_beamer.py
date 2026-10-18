@@ -8,6 +8,7 @@ import sys
 
 import pytest
 
+import fwl_visual_language as fvl
 from fwl_visual_language import __main__ as cli
 from fwl_visual_language import beamer, latex
 
@@ -21,8 +22,11 @@ BIB = r"""
 @article{many, author = {Gamma, Gil and Delta, Dee and Eps, Eve}, year = {2025},
   journal = {Astrophys. J. Lett.}, title = {C}}
 @incollection{book, author = {Alpha, Ann and Beta, Ben}, year = {2025},
-  booktitle = {Treatise on Things},
-  title = {D}}
+  booktitle = {Treatise on Things}, title = {D}}
+@article{prefix, author = {van Eylen, Vin}, year = {2024}, journal = {Astron. Astrophys.},
+  title = {E}}
+@article{others, author = {Zeta, Zoe and others}, year = {2022}, journal = {\mnras}, title = {F}}
+@misc{anon, title = {G}, year = {in press}, journal = {PSJ}}
 """
 
 TALK = r"""\documentclass[aspectratio=169]{beamer}
@@ -39,6 +43,9 @@ TALK = r"""\documentclass[aspectratio=169]{beamer}
   \slideref{two}
   \slideref{book,many}[right]
 \end{frame}
+\begin{frame}{More cases}\slideref{prefix,others}\slideref{anon,nokey}[right]\end{frame}
+\begin{frame}[plain]{A plain frame}\slideref{one}\end{frame}
+\begin{frame}{After the plain frame}Text.\end{frame}
 \begin{frame}[statement]{On ink-980}\slideref{many}\end{frame}
 \statementframe{A common assumption.}
 \closingframe[Positions]{A closing question?}
@@ -139,7 +146,7 @@ def test_talk_compiles_with_references_in_both_corners(tmp_path):
     (tmp_path / "refs.bib").write_text(BIB)
     (tmp_path / "talk.tex").write_text(TALK)
     log, pages = _compile(tmp_path)
-    assert len([p for p in pages if p.strip()]) == 8
+    assert len([p for p in pages if p.strip()]) == 11
     # 1 name, 2 names with "&", many names as "First+"; 2-digit year; journal names mapped
     assert "Alpha 23 MNRAS" in pages[3]
     corners = re.sub(r"\s+", " ", pages[4])
@@ -150,8 +157,18 @@ def test_talk_compiles_with_references_in_both_corners(tmp_path):
     lines = [ln for ln in pages[4].splitlines() if ln.strip()]
     assert "Alpha & Beta 24" in lines[-1] and "Gamma+ 25 ApJL" in lines[-1]
     # ink-950 on every frame, ink-980 only on the statement frames (6 and 7)
-    ink950, ink980 = (1, 3, 5), (0, 1, 1)
-    assert [_ground(tmp_path, n) for n in range(1, 9)] == [ink950] * 5 + [ink980] * 2 + [ink950]
+    more = re.sub(r"\s+", " ", pages[5])
+    assert "van Eylen 24 A&A" in more  # the prefix stays; journal mapped
+    assert "Zeta+ 22 MNRAS" in more  # "and others" gives "+"; ADS macro
+    assert "in press PSJ" in more and "+ in press" not in more  # no author, year kept
+    assert "nokey" in more  # an unknown key shows, not silently dropped
+    # a reference in a plain frame does not move to the next frame
+    assert "Alpha 23" not in pages[7]
+    # ink-950 on every frame, ink-980 only on the statement frames
+    ink = fvl.ramp("ink")
+    ink950, ink980 = (tuple(int(ink[s][i : i + 2], 16) for i in (1, 3, 5)) for s in ("950", "980"))
+    expected = [ink950] * 8 + [ink980] * 2 + [ink950]
+    assert [_ground(tmp_path, n) for n in range(1, 12)] == expected
 
 
 @pytest.mark.skipif(not (TEX and shutil.which("pdffonts")), reason="no TeX")
@@ -161,7 +178,10 @@ def test_talk_embeds_the_lab_fonts(tmp_path):
     beamer.install_beamer(tmp_path)
     Image.new("RGB", (10, 10)).save(tmp_path / "fig.png")
     (tmp_path / "refs.bib").write_text(BIB)
-    (tmp_path / "talk.tex").write_text(TALK)
+    # fwl loaded before the theme: the theme adds the math without an option clash
+    (tmp_path / "talk.tex").write_text(
+        TALK.replace("\\usetheme{fwl}", "\\usepackage{fwl}\n\\usetheme{fwl}")
+    )
     _compile(tmp_path)
     fonts = subprocess.run(
         ["pdffonts", "talk.pdf"], cwd=tmp_path, capture_output=True, text=True

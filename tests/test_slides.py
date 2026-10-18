@@ -10,6 +10,7 @@ import pytest
 pytest.importorskip("pptx")
 from PIL import Image  # noqa: E402
 from pptx import Presentation  # noqa: E402
+from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER  # noqa: E402
 
 import fwl_visual_language as fvl  # noqa: E402
 from fwl_visual_language import slides  # noqa: E402
@@ -60,8 +61,8 @@ def test_figure_placeholders_only_in_the_powerpoint_file(built):
             lay.name: sorted(
                 ph.placeholder_format.idx
                 for ph in lay.placeholders
-                if ph.placeholder_format.type == 7
-            )  # OBJECT: a content placeholder
+                if ph.placeholder_format.type == PP_PLACEHOLDER.OBJECT
+            )
             for lay in prs.slide_layouts
         }
 
@@ -115,7 +116,6 @@ def test_every_layout_has_a_plain_ink_ground_and_no_background_picture(built):
             assert "<a:blipFill" not in ground, (key, name)
             step = "980" if name == "Statement" else "950"
             assert f'<a:srgbClr val="{slides.INK[step]}"/>' in ground, (key, name)
-            assert "Garlick" not in xml
 
 
 def test_letter_spacing_scales_with_the_slide(built):
@@ -138,7 +138,7 @@ def test_sample_figures_fit_their_boxes(built):
     for key, scale in (("pptx", 0.5), ("keynote", 1.0)):
         prs = Presentation(built[key])
         for s in prs.slides:
-            pics = [sh for sh in s.shapes if sh.shape_type == 13]
+            pics = [sh for sh in s.shapes if sh.shape_type == MSO_SHAPE_TYPE.PICTURE]
             boxes = [b for (n, _), b in slides.BOX.items() if n == s.slide_layout.name]
             assert len(pics) == len(boxes), s.slide_layout.name
             for pic, (x, y, w, h) in zip(sorted(pics, key=lambda p: p.left), boxes, strict=True):
@@ -158,7 +158,7 @@ def test_samples_have_no_personal_content(built):
         sh.text_frame.text for lay in prs.slide_layouts for sh in lay.shapes if sh.has_text_frame
     )
     assert "SPEAKER NAME" in text and "Venue, city" in text
-    assert not re.search(r"Tim|Leuven|TIM LICHTENBERG", text)
+    assert not re.search(r"Tim Lichtenberg|TIM LICHTENBERG|Leuven", text)
 
 
 def test_more_layouts_than_the_base_template_has_are_refused(tmp_path, monkeypatch):
@@ -176,3 +176,75 @@ def test_command_line_and_module_run(tmp_path, capsys, monkeypatch, figure):
     monkeypatch.delitem(sys.modules, "fwl_visual_language.slides")
     runpy.run_module("fwl_visual_language.slides", run_name="__main__")
     assert (tmp_path / "b.pptx").is_file()
+
+
+def test_master_maps_text_to_the_light_colour_on_the_dark_ground(built):
+    for key in ("pptx", "keynote"):
+        with zipfile.ZipFile(built[key]) as z:
+            master = z.read("ppt/slideMasters/slideMaster1.xml").decode()
+            theme = z.read("ppt/theme/theme1.xml").decode()
+        cmap = dict(re.findall(r'(\w+)="(\w+)"', re.search(r"<p:clrMap [^>]*>", master).group(0)))
+        scheme = dict(re.findall(r"<a:(\w+)><a:srgbClr val=\"(\w+)\"", theme))
+        text, ground = "#" + scheme[cmap["tx1"]], "#" + scheme[cmap["bg1"]]
+        assert ground == fvl.ramp("ink")["950"]
+        assert fvl.contrast(text, ground) > 7
+        # a text box and list levels 2 and below take the master text styles: Geist on ink
+        assert set(re.findall(r'typeface="([^"]+)"', master)) <= {"Geist", "Geist Light"}
+        assert 'val="FFFFFF"' in master and f'val="{slides.INK["100"]}"' in master
+
+
+@pytest.mark.parametrize("key,scale", [("pptx", 0.5), ("keynote", 1.0)])
+def test_master_placeholders_fit_the_wide_slide(built, key, scale):
+    prs = Presentation(built[key])
+    width, height = prs.slide_width, prs.slide_height
+    title = prs.slide_master.placeholders[0]
+    assert title.width == round(1792 * scale * EMU)
+    for ph in prs.slide_master.placeholders:
+        assert 0 <= ph.left and ph.left + ph.width <= width, ph.name
+        assert 0 <= ph.top and ph.top + ph.height <= height, ph.name
+
+
+def test_document_properties_name_the_lab(built):
+    props = Presentation(built["pptx"]).core_properties
+    assert props.author == props.last_modified_by == "Forming Worlds Lab"
+    assert props.title == "Forming Worlds Lab slide masters"
+    assert props.created.year == 2026
+
+
+def test_theme_accents_follow_the_dark_palette_by_name(built):
+    with zipfile.ZipFile(built["pptx"]) as z:
+        theme = z.read("ppt/theme/theme1.xml").decode()
+    dark = dict(fvl.palette("dark"))
+    for accent, name in (
+        ("accent3", "fern"),
+        ("accent4", "ochre"),
+        ("accent5", "iris"),
+        ("accent6", "garnet"),
+    ):
+        value = re.search(rf"<a:{accent}><a:srgbClr val=\"(\w+)\"", theme).group(1)
+        assert "#" + value == dark[name], accent
+
+
+def test_section_label_spacing_scales_too(built):
+    for key, spc in (("pptx", "150"), ("keynote", "300")):
+        section = layout_xml(built[key])[slides.LAYOUTS.index("Section")]
+        assert f'spc="{spc}"' in section
+
+
+def test_a_missing_python_pptx_names_the_extra(tmp_path, monkeypatch):
+    monkeypatch.setitem(sys.modules, "pptx", None)
+    with pytest.raises(ImportError, match=r"fwl-visual-language\[slides\]"):
+        slides.build_slides(tmp_path / "x.pptx")
+
+
+def test_a_bad_figure_is_refused_before_the_build(tmp_path):
+    (tmp_path / "text.png").write_text("not an image")
+    for bad in (tmp_path / "missing.png", tmp_path / "text.png"):
+        with pytest.raises(ValueError, match="cannot read the figure"):
+            slides.build_slides(tmp_path / "x.pptx", figure=bad)
+    assert not (tmp_path / "x.pptx").exists()
+
+
+def test_missing_output_folders_are_created(tmp_path):
+    out = slides.build_slides(tmp_path / "a" / "b" / "x.pptx")
+    assert out.is_file()

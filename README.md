@@ -15,7 +15,7 @@ The tokens start from [formingworlds.space](https://www.formingworlds.space): th
 | `mpl/fwl-paper.mplstyle`, `mpl/fwl-dark.mplstyle` | matplotlib figures, through [fwl-mpl](https://github.com/FormingWorlds/fwl-mpl) | |
 | `documenter/fwl.css` | Documenter.jl sites, light and dark | `python -m fwl_visual_language.documenter docs/src/assets` |
 | `jupyterbook/fwl-jupyterbook.css` | Jupyter Book 1 (sphinx-book-theme), light and dark | `python -m fwl_visual_language.jupyterbook book/_static` |
-| `latex/fwl.sty` | colours and fonts for letters, proposals and the CV with LuaLaTeX or XeLaTeX; `\usepackage[math]{fwl}` adds the Inter and STIX Two math | `python -m fwl_visual_language.latex path/to/document` |
+| `latex/fwl.sty` | colours and fonts for letters, proposals and the CV with LuaLaTeX or XeLaTeX; `\usepackage[math]{fwl}` (or `\fwlusemath` in the preamble) adds the Inter and STIX Two math | `python -m fwl_visual_language.latex path/to/document` |
 | `latex/fwlproposal.sty` | page style of proposals and reports: A4 with 2 cm margins, numbered headings, captions, links, footer (`\fwltitle{title}{subtitle}`, `\renewcommand{\fwlfooter}{...}`); loads `fwl` with `math` | same command |
 | `beamer/beamerthemefwl.sty` | LaTeX talks (`\usetheme{fwl}`), LuaLaTeX and BibTeX | `python -m fwl_visual_language.beamer path/to/talk` |
 
@@ -38,7 +38,7 @@ The website's light theme reassigns the ramp steps instead of changing classes. 
 
 ## Slides
 
-The slide masters exist as a PowerPoint file, a Keynote theme and a beamer theme with the same 10 layouts: Title, Question, Section, Figure, Figure large, Two figures, Summary, Statement, Team and Closing. Every slide sits on the ink-950 ground (statements on ink-980) and takes figures in the dark figure style; the masters have no background picture, so a talk can add its own. Titles are one line of Geist Light. Key words take magma-400.
+The slide masters are a PowerPoint file with 10 layouts (Title, Question, Section, Figure; Figure, large; Two figures, Summary, Statement, Team and Closing), a Keynote source made from the same layouts, and a beamer theme with frames for the title, a question, a section, a figure, a statement and the closing slide. Every slide sits on the ink-950 ground (statements on ink-980) and takes figures in the dark figure style; the masters have no background picture, so a talk can add its own. Titles are one line of Geist Light. Key words take magma-400.
 
 Every content layout has 2 reference boxes, bottom left and bottom right, in 24 pt on the 1920 x 1080 design. A box is anchored at its base, so several references stack upward and never run off the slide. The format is `Teske+ 25 ApJL`: 1 or 2 family names (`Lichtenberg & Miguel 25`), else the first plus `+`, a 2-digit year and the journal in italics.
 
@@ -48,9 +48,9 @@ python -m fwl_visual_language.slides "Forming Worlds.pptx"                   # P
 python -m fwl_visual_language.slides fwl-keynote-source.pptx --keynote      # Keynote source
 ```
 
-The PowerPoint file is 13.333 x 7.5 in; its figure boxes are content placeholders, not picture placeholders, and Google Slides uses the same file. The Keynote source is 1920 x 1080 pt without figure boxes, because Keynote removes them on import. Open it in Keynote and save it; Keynote turns the layouts into master slides, and a copy of the saved file with the extension `.kth` is the theme: Keynote makes a new presentation with all 10 masters from it. Geist and Inter must be installed on the computer for Keynote and PowerPoint.
+The PowerPoint file is 13.333 x 7.5 in; its figure boxes are content placeholders, not picture placeholders. For Google Slides, import this file. The Keynote source is 1920 x 1080 pt without figure boxes, because Keynote (checked with Keynote 15.4) removes them on import. Open it in Keynote and save it; Keynote turns the layouts into master slides, and a copy of the saved file with the extension `.kth` is the theme: Keynote makes a new presentation with all 10 masters from it. Keynote and PowerPoint need the Geist and Geist Mono fonts installed on the computer (the masters use Geist, Geist Light, Geist Medium and Geist Mono).
 
-In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom left corner and `\slideref{key}[right]` in the bottom right one; one call can take several keys. `\fwljournal{name in the .bib}{name on the slide}` adds a journal name to the list that maps, for example, `Mon. Not. R. Astron. Soc.` to `MNRAS`. The frames are `\titleframe`, `\questionframe[sub-question]{question}`, `\sectionframe{label}{statement}`, `\figureframe{title}{side text}{image}`, `\statementframe{text}`, `\closingframe[announcement]{statement}`, plain frames, and `[statement]` frames on ink-980. Compile with `lualatex`, `bibtex`, then `lualatex` twice.
+In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom left corner and `\slideref{key}[right]` in the bottom right one; one call can take several keys; an unknown key prints the key itself. `\fwljournal{name in the .bib}{name on the slide}` adds a journal name to the list that maps, for example, `Mon. Not. R. Astron. Soc.` to `MNRAS`; the common ADS journal macros (`\mnras`, `\apjl`, ...) are defined when the document has none. `\fwlhl{word}` sets a key word in magma-400 (also as `\hl` when no other package defines it). The frames are `\titleframe`, `\questionframe[sub-question]{question}`, `\sectionframe{label}{statement}`, `\figureframe{title}{side text}{image}`, `\statementframe{text}`, `\closingframe[announcement]{statement}`, ordinary frames, and `[statement]` frames on ink-980. `[plain]` frames have no reference corners. Compile with `lualatex`, `bibtex`, then `lualatex` twice.
 
 ## Develop
 

@@ -20,6 +20,7 @@ Build it with the ``slides`` extra (``python-pptx``)::
 """
 
 import argparse
+from datetime import datetime
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -49,7 +50,7 @@ INK = {step: hexv[1:] for step, hexv in ramp("ink").items()}
 SIGNAL400 = ramp("signal")["400"][1:]
 SIGNAL300 = ramp("signal")["300"][1:]
 MAGMA400 = ramp("magma")["400"][1:]
-DARK = [hexv[1:] for _, hexv in palette("dark")]
+DARK = {name: hexv[1:] for name, hexv in palette("dark")}
 WHITE = "FFFFFF"
 REF_PT, REF_W, REF_H, EDGE = 24, 900, 220, 28
 REF_PROMPT = [[("Author+ YY ", False), ("Journal", True)]]
@@ -60,6 +61,11 @@ BOX = {
     ("Two figures", 10): (64, 200, 880, 770),
     ("Two figures", 11): (976, 200, 880, 770),
 }
+
+
+def _attr(text):
+    """Escape text for an XML attribute value."""
+    return escape(text, {'"': "&quot;"})
 
 
 class _Geo:
@@ -153,7 +159,7 @@ class _Layout:
             f"{paras}</p:txBody>"
         )
         self.shapes.append(
-            f'<p:sp><p:nvSpPr><p:cNvPr id="{self._id()}" name="{name}"/><p:cNvSpPr>'
+            f'<p:sp><p:nvSpPr><p:cNvPr id="{self._id()}" name="{_attr(name)}"/><p:cNvSpPr>'
             f'<a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph {typ}/></p:nvPr></p:nvSpPr>'
             f"<p:spPr>{self._xfrm(*box)}</p:spPr>{body}</p:sp>"
         )
@@ -161,8 +167,8 @@ class _Layout:
     def text(self, name, box, s, size, color, align="l"):
         """Add fixed text, not a placeholder."""
         self.shapes.append(
-            f'<p:sp><p:nvSpPr><p:cNvPr id="{self._id()}" name="{name}"/><p:cNvSpPr txBox="1"/>'
-            f'<p:nvPr userDrawn="1"/></p:nvSpPr><p:spPr>{self._xfrm(*box)}'
+            f'<p:sp><p:nvSpPr><p:cNvPr id="{self._id()}" name="{_attr(name)}"/>'
+            f'<p:cNvSpPr txBox="1"/><p:nvPr userDrawn="1"/></p:nvSpPr><p:spPr>{self._xfrm(*box)}'
             '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>'
             '<p:txBody><a:bodyPr wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="ctr">'
             f'<a:noAutofit/></a:bodyPr><a:lstStyle/><a:p><a:pPr algn="{align}"/><a:r>'
@@ -174,7 +180,7 @@ class _Layout:
         key = f"__IMG{len(self.images)}__"
         self.images[key] = path
         self.shapes.append(
-            f'<p:pic><p:nvPicPr><p:cNvPr id="{self._id()}" name="{name}"/><p:cNvPicPr>'
+            f'<p:pic><p:nvPicPr><p:cNvPr id="{self._id()}" name="{_attr(name)}"/><p:cNvPicPr>'
             '<a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr userDrawn="1"/></p:nvPicPr>'
             f'<p:blipFill><a:blip r:embed="{key}"/><a:stretch><a:fillRect/></a:stretch>'
             f'</p:blipFill><p:spPr>{self._xfrm(*box)}<a:prstGeom prst="rect"><a:avLst/>'
@@ -187,7 +193,7 @@ class _Layout:
             "<a:effectLst/></p:bgPr></p:bg>"
         )
         return (
-            f'<p:sldLayout {_NS} preserve="1" userDrawn="1"><p:cSld name="{escape(self.name)}">'
+            f'<p:sldLayout {_NS} preserve="1" userDrawn="1"><p:cSld name="{_attr(self.name)}">'
             f'{bg}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/>'
             '</p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/>'
             '<a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'
@@ -470,10 +476,10 @@ def _theme_xml(blob):
         "lt2": INK["100"],
         "accent1": MAGMA400,
         "accent2": SIGNAL400,
-        "accent3": DARK[2],
-        "accent4": DARK[4],
-        "accent5": DARK[3],
-        "accent6": DARK[6],
+        "accent3": DARK["fern"],
+        "accent4": DARK["ochre"],
+        "accent5": DARK["iris"],
+        "accent6": DARK["garnet"],
         "hlink": SIGNAL400,
         "folHlink": SIGNAL300,
     }
@@ -520,7 +526,7 @@ def _samples(prs, g, figure):
             _fill(phs[idx], lines)
         for idx in figs if figure is not None else ():
             if idx in phs:  # the sample figure takes the place of the empty box
-                phs[idx]._element.getparent().remove(phs[idx]._element)
+                phs[idx].element.getparent().remove(phs[idx].element)
             x, y, w, h = BOX[(name, idx)]
             with Image.open(figure) as im:
                 aspect = im.width / im.height
@@ -594,13 +600,65 @@ def _samples(prs, g, figure):
     )
 
 
+def _master(master, g):
+    """Set the master to the dark colour map, 16:9 placeholders and Geist text styles."""
+    from pptx.oxml import parse_xml
+    from pptx.util import Emu
+
+    el = master.element
+    p_ns = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+    bg = el.find(f"{p_ns}cSld/{p_ns}bg")
+    bg.getparent().replace(
+        bg,
+        parse_xml(
+            f'<p:bg {_NS}><p:bgPr><a:solidFill><a:srgbClr val="{INK["950"]}"/></a:solidFill>'
+            "<a:effectLst/></p:bgPr></p:bg>"
+        ),
+    )
+    # Text and background 1 map to the light and dark theme colours: text that takes no
+    # colour of its own (a new text box, a table, list levels 2 and below) is light.
+    clr = el.find(f"{p_ns}clrMap")
+    clr.attrib.update({"bg1": "dk1", "tx1": "lt1", "bg2": "dk2", "tx2": "lt2"})
+    boxes = {
+        "TITLE": (64, 40, 1792, 90),
+        "BODY": (64, 190, 1792, 790),
+        "DATE": (EDGE, 1040, 400, 24),
+        "FOOTER": (660, 1040, 600, 24),
+        "SLIDE_NUMBER": (16, 10, 120, 24),
+    }
+    for ph in master.placeholders:
+        x, y, w, h = boxes[ph.placeholder_format.type.name]
+        ph.left, ph.top, ph.width, ph.height = (Emu(g.e(v)) for v in (x, y, w, h))
+
+    def level(n, size, color, face, bullet):
+        mar = 0 if not bullet else 40 * n
+        bu = f'<a:buFont typeface="{face}"/><a:buChar char="•"/>' if bullet else "<a:buNone/>"
+        return (
+            f'<a:lvl{n}pPr marL="{g.e(mar)}" indent="{-g.e(30) if bullet else 0}">'
+            f'<a:spcBef><a:spcPts val="{g.sz(8)}"/></a:spcBef>{bu}'
+            + _rpr(g, size, color, face)
+            + f"</a:lvl{n}pPr>"
+        )
+
+    styles = (
+        f"<p:txStyles {_NS}><p:titleStyle>{level(1, 72, WHITE, 'Geist Light', False)}"
+        "</p:titleStyle>"
+        "<p:bodyStyle>"
+        + "".join(level(n, 34 - 4 * min(n - 1, 3), INK["100"], "Geist", True) for n in range(1, 6))
+        + f"</p:bodyStyle><p:otherStyle>{level(1, 24, INK['100'], 'Geist', False)}</p:otherStyle>"
+        "</p:txStyles>"
+    )
+    old = el.find(f"{p_ns}txStyles")
+    old.getparent().replace(old, parse_xml(styles))
+
+
 def build_slides(out, keynote=False, figure=None):
     """Write the slide master file.
 
     Parameters
     ----------
     out : str or pathlib.Path
-        Path of the ``.pptx`` to write.
+        Path of the ``.pptx`` to write; missing parent folders are created.
     keynote : bool, optional
         Write the Keynote source: 1920 x 1080 pt and no figure placeholders.
         Otherwise the file is 13.333 x 7.5 in with figure placeholders.
@@ -615,45 +673,65 @@ def build_slides(out, keynote=False, figure=None):
     Raises
     ------
     ImportError
-        If ``python-pptx`` is not installed (``pip install "fwl-visual-language[slides]"``).
-    RuntimeError
-        If the python-pptx base template has fewer layouts than :data:`LAYOUTS`.
+        If ``python-pptx`` is not installed; the message names the ``slides`` extra.
+    ValueError
+        If ``figure`` cannot be read as an image.
     """
-    from pptx import Presentation
-    from pptx.oxml import parse_xml
-    from pptx.util import Emu
+    try:
+        from pptx import Presentation
+        from pptx.oxml import parse_xml
+        from pptx.util import Emu
+    except ImportError as err:
+        raise ImportError(
+            'the slide masters need python-pptx: pip install "fwl-visual-language[slides]"'
+        ) from err
+    if figure is not None:
+        from PIL import Image, UnidentifiedImageError
+
+        try:
+            with Image.open(figure) as im:
+                im.verify()
+        except (OSError, UnidentifiedImageError) as err:
+            raise ValueError(f"cannot read the figure {figure}: {err}") from err
 
     g = _Geo(1.0 if keynote else 0.5)
     prs = Presentation()
     prs.slide_width, prs.slide_height = Emu(g.e(1920)), Emu(g.e(1080))
     master = prs.slide_master
-    p_ns = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
-    bg = master._element.find(f"{p_ns}cSld/{p_ns}bg")
-    bg.getparent().replace(
-        bg,
-        parse_xml(
-            f'<p:bg {_NS}><p:bgPr><a:solidFill><a:srgbClr val="{INK["950"]}"/></a:solidFill>'
-            "<a:effectLst/></p:bgPr></p:bg>"
-        ),
-    )
+    _master(master, g)
     theme = next(r.target_part for r in master.part.rels.values() if r.reltype.endswith("/theme"))
-    theme._blob = _theme_xml(theme.blob)
+    theme.blob = _theme_xml(theme.blob)
+    props = prs.core_properties
+    props.title, props.author, props.last_modified_by = (
+        "Forming Worlds Lab slide masters",
+        "Forming Worlds Lab",
+        "Forming Worlds Lab",
+    )
+    props.created = props.modified = datetime(2026, 10, 18)
+    props.revision = 1
 
     defs = _layouts(g, figures=not keynote)
     while len(prs.slide_layouts) > len(defs):  # the base template has 11 layouts
         prs.slide_layouts.remove(prs.slide_layouts[-1])
-    parts = [lay.part for lay in prs.slide_layouts]
-    if len(parts) != len(defs):
-        raise RuntimeError(f"expected {len(defs)} layouts in the base template, got {len(parts)}")
-    for lay, part in zip(defs, parts, strict=True):
+    layouts = list(prs.slide_layouts)
+    if len(layouts) != len(defs):
+        raise RuntimeError(f"expected {len(defs)} layouts in the base template, got {len(layouts)}")
+    for lay, layout in zip(defs, layouts, strict=True):
         xml = lay.xml()
         for key, path in lay.images.items():
-            _, rid = part.get_or_add_image_part(str(path))
+            _, rid = layout.part.get_or_add_image_part(str(path))
             xml = xml.replace(f'r:embed="{key}"', f'r:embed="{rid}"')
-        part._element = parse_xml(xml)
-        part.__dict__.pop("slide_layout", None)  # drop the cached wrapper of the old XML
+        # Replace the content in place, so every wrapper of this layout sees the new XML.
+        old, new = layout.element, parse_xml(xml)
+        old.attrib.clear()
+        old.attrib.update(new.attrib)
+        for child in list(old):
+            old.remove(child)
+        for child in list(new):
+            old.append(child)
     _samples(prs, g, figure)
     out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     prs.save(out)
     return out
 
