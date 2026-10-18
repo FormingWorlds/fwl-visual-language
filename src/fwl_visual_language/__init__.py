@@ -200,7 +200,11 @@ def oklch_css(name, step):
     lch = _step_oklch(name, step)
     if lch is None:
         return tokens()["ramps"][name]["steps"][step].upper()
-    L, C, h = lch
+    return _oklch_text(*lch)
+
+
+def _oklch_text(L, C, h):
+    """Return ``oklch(L C h)`` with 3 decimals for L and C, the website's form."""
     return f"oklch({L:.3f} {C:.3f} {h:g})"
 
 
