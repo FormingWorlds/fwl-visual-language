@@ -584,3 +584,13 @@ def test_the_university_letter_places_banner_and_logo_by_page(built):
         for kind in ("first", "default"):
             x, imgs = feet[kind]
             assert imgs == [ink] and x.find(".//w:fldSimple", NS) is not None, (face, kind)
+
+
+def test_the_theme_fonts_are_the_face(built):
+    a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    for (kind, face), path in built.items():
+        scheme = part(path, "word/theme/theme1.xml").find(f".//{a}fontScheme")
+        major = scheme.find(f"{a}majorFont/{a}latin").get("typeface")
+        minor = scheme.find(f"{a}minorFont/{a}latin").get("typeface")
+        assert (major, minor) == (FACE[face][2], FACE[face][0]), (kind, face)
+        assert scheme.get("name") == "Forming Worlds Lab"

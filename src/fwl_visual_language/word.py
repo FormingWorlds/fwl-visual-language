@@ -195,6 +195,20 @@ class _Builder:
             st.paragraph_format.space_after = self.Pt(after)
         return st
 
+    def theme(self):
+        """Point the theme fonts (+Headings, +Body in Word's font menu) at the face."""
+        from docx.opc.constants import RELATIONSHIP_TYPE as RT
+        from lxml import etree
+
+        part = self.doc.part.part_related_by(RT.THEME)
+        root = etree.fromstring(part.blob)
+        a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+        scheme = root.find(f".//{a}fontScheme")
+        scheme.set("name", "Forming Worlds Lab")
+        for tag, face in (("majorFont", self.f["medium"]), ("minorFont", self.f["regular"])):
+            scheme.find(f"{a}{tag}/{a}latin").set("typeface", face)
+        part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+
     def numbering(self):
         """Add the heading numbers, the list bullet and the step numbers, all in signal blue."""
         num = self.doc.part.numbering_part.element
@@ -579,6 +593,7 @@ def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
         for kind in kinds:
             b = _Builder(face, docx, "B" if kind == "handbook" else "A")
             b.styles()
+            b.theme()
             getattr(b, kind.replace("-", "_"))()
             out = folder / f"{template_name(kind, face)}.{'dotx' if template else 'docx'}"
             b.save(out, template)
