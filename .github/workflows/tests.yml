@@ -45,7 +45,7 @@ jobs:
           pip install build
           python -m build --wheel .
       - name: Install the wheel with the oldest supported test dependencies
-        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" "python-pptx==1.0.*" colorspacious pytest dist/*.whl
+        run: pip install "matplotlib==3.7.*" "cmcrameri==1.7.*" "numpy<2" "python-pptx==1.0.*" "python-docx==1.1.*" colorspacious pytest dist/*.whl
       - name: Run the tests against the installed package
         run: |
           mkdir ../wheeltest

@@ -57,6 +57,19 @@ The built files are in `templates/`: `Forming Worlds.pptx` for PowerPoint and Go
 
 In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom left corner and `\slideref{key}[right]` in the bottom right one; one call can take several keys; an unknown key prints the key itself. `\fwljournal{name in the .bib}{name on the slide}` adds a journal name to the list that maps, for example, `Mon. Not. R. Astron. Soc.` to `MNRAS`; the common ADS journal macros (`\mnras`, `\apjl`, ...) are defined at `\begin{document}` where the preamble defines none. `\fwlhl{word}` sets a key word in magma-400, also as `\hl` when the preamble (for example `soul`) defines no `\hl`. Put `\slideref` inside a frame; the title and closing frames keep their bottom right corner for the logo. The frames are `\titleframe`, `\questionframe[sub-question]{question}`, `\sectionframe{label}{statement}`, `\figureframe{title}{side text}{image}`, `\statementframe{text}`, `\closingframe[announcement]{statement}`, ordinary frames, and `[statement]` frames on ink-980. `[plain]` frames have no reference corners. Compile with `lualatex`, `bibtex`, then `lualatex` twice.
 
+## Word
+
+```bash
+pip install "fwl-visual-language[word]"
+python -m fwl_visual_language.word templates
+```
+
+The command writes Word templates for 5 kinds of document, each in 2 faces: `Forming Worlds Letter`, `Forming Worlds University Letter`, `Forming Worlds Report`, `Forming Worlds Memo` and `Forming Worlds Handbook`, in Geist for documents that leave as PDF and in Aptos, the Office default, for documents that others edit without the lab fonts. The built `.dotx` files are in `templates/`, and a test checks that each one matches a fresh build.
+
+Text, headings, lists, notes and captions use named styles, among them Normal, Title, Subtitle, Heading 1 to 3 (Heading 1 and 2 numbered, with the numbers in signal blue), Caption, List Bullet, List Number and List Number 2, Note, Key word (magma), Hyperlink and the contents styles, so typed text keeps the lab look. The letter has the lab logo and the sender block on its first page; the university letter has the banner of the University of Groningen, the Faculty of Science and Engineering and the Kapteyn Astronomical Institute, with the lab logo in the footer. Both letters set their body text justified; dates, subjects, headings and captions stay left-aligned. The handbook has a cover with a welcome note, a contents field (right-click it and choose Update Field) and chapters that start on a new page.
+
+In Word for Mac, export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service; with Word 16.113 it replaced Geist with Calibri and Cambria. Geist must be installed on the computer; Word 16.113 ships with Aptos.
+
 ## Develop
 
 ```bash
@@ -70,4 +83,4 @@ python -m venv .venv
 
 ## Licence
 
-Code and tokens: Apache 2.0. Geist, Geist Mono, Inter and STIX Two Math: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`. The logo in `src/fwl_visual_language/assets/`, also on the slide templates in `templates/`, is the mark of the Forming Worlds Lab, as on formingworlds.space. It is not covered by the Apache 2.0 or OFL licences of this repository; use it only for material of the Forming Worlds Lab.
+Code and tokens: Apache 2.0. Geist, Geist Mono, Inter and STIX Two Math: SIL Open Font License 1.1, bundled unmodified with their licence texts in `src/fwl_visual_language/fonts/`. The logo in `src/fwl_visual_language/assets/`, also on the slide templates in `templates/`, is the mark of the Forming Worlds Lab, as on formingworlds.space. It is not covered by the Apache 2.0 or OFL licences of this repository; use it only for material of the Forming Worlds Lab. The banner `rug-banner.png` in the same folder, which the university letter templates embed, carries the marks of the University of Groningen, its Faculty of Science and Engineering and the Kapteyn Astronomical Institute. It ships in the package with the other assets, it is not covered by these licences, and this repository grants no permission for it: use it only as the university's rules for these marks allow.
