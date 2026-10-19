@@ -13,13 +13,15 @@ license-files = [
     "LICENSE",
     "src/fwl_visual_language/fonts/OFL-Geist.txt",
     "src/fwl_visual_language/fonts/OFL-Inter.txt",
+    "src/fwl_visual_language/fonts/OFL-STIX.txt",
 ]
 authors = [{ name = "Forming Worlds Lab" }]
 dependencies = []
 keywords = ["design-tokens", "theme", "matplotlib", "documenter", "sphinx"]
 
 [project.optional-dependencies]
-test = ["pytest>=7", "pytest-cov>=4", "colorspacious>=1.1", "numpy>=1.22", "matplotlib>=3.7", "cmcrameri>=1.7"]
+slides = ["python-pptx>=1.0,<2"]
+test = ["pytest>=7", "pytest-cov>=4", "colorspacious>=1.1", "numpy>=1.22", "matplotlib>=3.7", "cmcrameri>=1.7", "python-pptx>=1.0,<2"]
 
 [project.urls]
 Repository = "https://github.com/FormingWorlds/fwl-visual-language"
@@ -34,7 +36,7 @@ version = { attr = "fwl_visual_language.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-fwl_visual_language = ["tokens/*.json", "fonts/*.txt", "fonts/ttf/*", "fonts/woff2/*"]
+fwl_visual_language = ["tokens/*.json", "fonts/*.txt", "fonts/ttf/*", "fonts/otf/*", "fonts/woff2/*", "assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

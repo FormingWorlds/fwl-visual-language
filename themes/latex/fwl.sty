@@ -1,6 +1,9 @@
-% Forming Worlds Lab LaTeX package (fwl-visual-language 0.1.0). Generated from the lab tokens; edit tokens/fwl.json, not this file.
+% Forming Worlds Lab LaTeX package (fwl-visual-language 0.2.0). Generated from the lab tokens; edit tokens/fwl.json, not this file.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{fwl}[2026/10/17 v0.1.0 Forming Worlds Lab]
+\ProvidesPackage{fwl}[2026/10/18 v0.2.0 Forming Worlds Lab]
+\newif\iffwl@math
+\DeclareOption{math}{\fwl@mathtrue}
+\ProcessOptions\relax
 \RequirePackage{xcolor}
 \RequirePackage{fontspec}
 
@@ -80,5 +83,23 @@
   BoldFont=GeistMono-Medium.ttf,
   FontFace={md}{n}{GeistMono-Medium.ttf}]
 \newcommand{\fwlmedium}{\fontseries{md}\selectfont}
+
+% Math: letters, digits and Greek from Inter (Medium for bold), everything
+% else from STIX Two. The math option or \fwlusemath in the preamble loads it once.
+\newif\iffwl@mathdone
+\newcommand{\fwlusemath}{\iffwl@mathdone\else\global\fwl@mathdonetrue
+  \RequirePackage{unicode-math}
+  \setmathfont{STIXTwoMath-Regular.otf}[Path=\fwlfontpath]
+  \setmathfont{Inter-Regular.ttf}[Path=\fwlfontpath,
+    range={up/{latin,Latin,num,greek,Greek}}]
+  \setmathfont{Inter-Italic.ttf}[Path=\fwlfontpath,
+    range={it/{latin,Latin,greek,Greek}}]
+  \setmathfont{Inter-Medium.ttf}[Path=\fwlfontpath,
+    range={bfup/{latin,Latin,num,greek,Greek}}]
+  \setmathfont{Inter-MediumItalic.ttf}[Path=\fwlfontpath,
+    range={bfit/{latin,Latin,greek,Greek}}]
+\fi}
+\@onlypreamble\fwlusemath
+\iffwl@math\fwlusemath\fi
 \color{fwlText}
 \endinput
