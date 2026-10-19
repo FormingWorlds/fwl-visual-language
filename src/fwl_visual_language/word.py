@@ -1,0 +1,558 @@
+"""Word templates for letters, reports, memos and handbooks, written as ``.dotx`` files.
+
+The handbook, for long internal documents, has a cover, a contents field and
+chapters that start on a new page; the report keeps its chapters in the text
+flow. Each kind comes in two faces: Geist, for documents that leave as PDF, and
+Aptos, the Office default, for documents that others edit without the lab
+fonts. Every format lives in a named style (Normal, Title, Subtitle, numbered
+Heading 1 and 2, Caption, List Bullet, Hyperlink, Key word, Header, Footer),
+so text typed into a template keeps the lab look. Pages are A4 with the ink
+logo for paper, ink text and signal-blue accents, as in ``fwlproposal.sty``.
+
+Build them with the ``word`` extra (``python-docx``)::
+
+    python -m fwl_visual_language.word templates
+"""
+
+import argparse
+from datetime import datetime
+from pathlib import Path
+
+from . import assets_dir, ramp
+
+__all__ = ["FACES", "KINDS", "build_word", "template_name"]
+
+FACES = {
+    "geist": {"regular": "Geist", "light": "Geist Light", "medium": "Geist Medium"},
+    "aptos": {"regular": "Aptos", "light": "Aptos Light", "medium": "Aptos SemiBold"},
+}
+KINDS = ("letter", "report", "memo", "handbook")
+TEMPLATE_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
+PAGE_W, PAGE_H, SIDE = 21.0, 29.7, 2.2  # cm
+TEXT_W = PAGE_W - 2 * SIDE
+HEADING_NUM, BULLET_NUM, LIST_NUM = 90, 91, 92
+LAB_LINE = "Forming Worlds Lab  ·  Kapteyn Astronomical Institute  ·  University of Groningen"
+SENDER = (
+    "Name Surname",
+    "Role, Forming Worlds Lab",
+    "Kapteyn Astronomical Institute",
+    "University of Groningen",
+    "Landleven 12, 9747 AD Groningen",
+    "name@rug.nl  ·  formingworlds.space",
+)
+# pPr and rPr children that may follow the elements this module adds, in schema order
+_PPR_AFTER_PBDR = (
+    "w:shd",
+    "w:tabs",
+    "w:suppressAutoHyphens",
+    "w:spacing",
+    "w:ind",
+    "w:jc",
+    "w:rPr",
+)
+_RPR_AFTER_SPACING = ("w:w", "w:kern", "w:position", "w:sz", "w:szCs", "w:highlight", "w:u")
+
+
+def _hex(name, step):
+    return ramp(name)[step].lstrip("#")
+
+
+def template_name(kind, face):
+    """Return the file name of one template, for example ``Forming Worlds Letter (Geist)``.
+
+    Parameters
+    ----------
+    kind : str
+        One of :data:`KINDS`.
+    face : str
+        One of the keys of :data:`FACES`.
+
+    Returns
+    -------
+    str
+        The name without extension.
+    """
+    return f"Forming Worlds {kind.capitalize()} ({face.capitalize()})"
+
+
+class _Builder:
+    """Write one template; the python-docx imports stay inside the build call."""
+
+    def __init__(self, face, docx, chapters="A"):
+        self.f = FACES[face]
+        self.chapters = chapters
+        self.docx = docx
+        from docx.oxml import OxmlElement, parse_xml
+        from docx.oxml.ns import nsdecls, qn
+        from docx.shared import Cm, Pt, RGBColor
+
+        self.E, self.parse, self.nsdecls, self.qn = OxmlElement, parse_xml, nsdecls, qn
+        self.Cm, self.Pt, self.RGB = Cm, Pt, RGBColor
+        self.doc = docx.Document()
+
+    # --- low-level XML helpers -------------------------------------------------------------
+
+    def fonts(self, rpr, name):
+        """Replace the run fonts of ``rpr`` (including theme fonts) by one face."""
+        old = rpr.find(self.qn("w:rFonts"))
+        new = self.E("w:rFonts")
+        for a in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+            new.set(self.qn(a), name)
+        if old is not None:
+            old.getparent().replace(old, new)
+        else:
+            rpr.insert_element_before(new, *rpr_successors("w:rFonts"))
+
+    def tracking(self, rpr, points):
+        sp = self.E("w:spacing")
+        sp.set(self.qn("w:val"), str(round(points * 20)))
+        rpr.insert_element_before(sp, *_RPR_AFTER_SPACING)
+
+    def border(self, ppr, side, color, eighths, space=4):
+        bdr = self.E("w:pBdr")
+        b = self.E(f"w:{side}")
+        for k, v in (("val", "single"), ("sz", eighths), ("space", space), ("color", color)):
+            b.set(self.qn(f"w:{k}"), str(v))
+        bdr.append(b)
+        ppr.insert_element_before(bdr, *_PPR_AFTER_PBDR)
+
+    def right_tab(self, paragraph):
+        """Clear the centre and right tabs of the Header and Footer styles; add one at the edge."""
+        from docx.enum.text import WD_TAB_ALIGNMENT
+        from docx.shared import Twips
+
+        ts = paragraph.paragraph_format.tab_stops
+        for twips in (4680, 9360):
+            ts.add_tab_stop(Twips(twips), WD_TAB_ALIGNMENT.CLEAR)
+        ts.add_tab_stop(self.Cm(TEXT_W), WD_TAB_ALIGNMENT.RIGHT)
+
+    def leader_tab(self, style):
+        """Give a contents style a right tab at the margin with a dotted leader."""
+        tabs = self.parse(
+            f'<w:tabs {self.nsdecls("w")}><w:tab w:val="right" w:leader="dot" '
+            f'w:pos="{round(TEXT_W / 2.54 * 1440)}"/></w:tabs>'
+        )
+        style.element.get_or_add_pPr().insert_element_before(tabs, *_PPR_AFTER_PBDR[2:])
+
+    def page_field(self, paragraph):
+        fld = self.parse(
+            f'<w:fldSimple {self.nsdecls("w")} w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple>'
+        )
+        paragraph._p.append(fld)
+
+    def no_borders(self, table):
+        b = self.parse(
+            f"<w:tblBorders {self.nsdecls('w')}>"
+            + "".join(
+                f'<w:{e} w:val="nil"/>'
+                for e in ("top", "left", "bottom", "right", "insideH", "insideV")
+            )
+            + "</w:tblBorders>"
+        )
+        table._tbl.tblPr.append(b)
+
+    # --- styles ----------------------------------------------------------------------------
+
+    def style(self, name, size=None, color=None, face=None, before=None, after=None, kind=None):
+        """Return a paragraph or character style with face, size, colour and spacing set."""
+        from docx.enum.style import WD_STYLE_TYPE
+
+        styles = self.doc.styles
+        if name in [s.name for s in styles]:
+            st = styles[name]
+        else:
+            st = styles.add_style(name, kind or WD_STYLE_TYPE.PARAGRAPH)
+            if st.type == WD_STYLE_TYPE.PARAGRAPH:
+                st.base_style = styles["Normal"]
+                st.quick_style = True
+        st.font.bold = st.font.italic = None
+        rpr = st.element.get_or_add_rPr()
+        # Word's built-in styles carry tracking, kerning and complex-script weights of their own
+        for tag in ("w:bCs", "w:iCs", "w:spacing", "w:kern", "w:szCs"):
+            for el in rpr.findall(self.qn(tag)):
+                rpr.remove(el)
+        if size:
+            st.font.size = self.Pt(size)
+            szcs = self.E("w:szCs")
+            szcs.set(self.qn("w:val"), str(round(size * 2)))
+            rpr.insert_element_before(szcs, *rpr_successors("w:szCs"))
+        if color:
+            st.font.color.rgb = self.RGB.from_string(color)
+        self.fonts(rpr, face or self.f["regular"])
+        if before is not None:
+            st.paragraph_format.space_before = self.Pt(before)
+        if after is not None:
+            st.paragraph_format.space_after = self.Pt(after)
+        return st
+
+    def numbering(self):
+        """Add the heading numbers, the list bullet and the step numbers, all in signal blue."""
+        num = self.doc.part.numbering_part.element
+        sig, f = _hex("signal", "500"), self.f["regular"]
+        big = '<w:sz w:val="40"/><w:szCs w:val="40"/>' if self.chapters == "B" else None
+
+        def lvl(i, fmt, text, ind, style=None, font=None, left=None, size=None):
+            pstyle = f'<w:pStyle w:val="{style}"/>' if style else ""
+            slots = ("ascii", "hAnsi", "eastAsia", "cs")
+            rfonts = (
+                "<w:rFonts " + " ".join(f'w:{s}="{font}"' for s in slots) + "/>" if font else ""
+            )
+            return (
+                f'<w:lvl w:ilvl="{i}"><w:start w:val="1"/><w:numFmt w:val="{fmt}"/>{pstyle}'
+                f'<w:lvlText w:val="{text}"/><w:lvlJc w:val="left"/>'
+                f'<w:pPr><w:ind w:left="{left or ind}" w:hanging="{ind}"/></w:pPr>'
+                f'<w:rPr>{rfonts}<w:color w:val="{sig}"/>{size or ""}</w:rPr></w:lvl>'
+            )
+
+        heads = self.parse(
+            f'<w:abstractNum {self.nsdecls("w")} w:abstractNumId="{HEADING_NUM}">'
+            '<w:multiLevelType w:val="multilevel"/>'
+            + lvl(0, "decimal", "%1", 567 if self.chapters == "A" else 850, "Heading1", size=big)
+            + lvl(1, "decimal", "%1.%2", 567, "Heading2")
+            + "</w:abstractNum>"
+        )
+        bullet = self.parse(
+            f'<w:abstractNum {self.nsdecls("w")} w:abstractNumId="{BULLET_NUM}">'
+            '<w:multiLevelType w:val="singleLevel"/>'
+            + lvl(0, "bullet", "•", 284, "ListBullet", f)
+            + "</w:abstractNum>"
+        )
+        steps = self.parse(
+            f'<w:abstractNum {self.nsdecls("w")} w:abstractNumId="{LIST_NUM}">'
+            '<w:multiLevelType w:val="multilevel"/>'
+            + lvl(0, "decimal", "%1.", 357, "ListNumber")
+            + lvl(1, "lowerLetter", "%2.", 357, "ListNumber2", left=714)
+            + "</w:abstractNum>"
+        )
+        for a in (steps, bullet, heads):  # every abstractNum must come before the first num
+            num.insert(0, a)
+        for n in (HEADING_NUM, BULLET_NUM, LIST_NUM):
+            num.append(
+                self.parse(
+                    f'<w:num {self.nsdecls("w")} w:numId="{n}">'
+                    f'<w:abstractNumId w:val="{n}"/></w:num>'
+                )
+            )
+
+    def link(self, style, num_id, level):
+        ppr = style.element.get_or_add_pPr()
+        old = ppr.find(self.qn("w:numPr"))
+        if old is not None:
+            ppr.remove(old)
+        numpr = ppr.get_or_add_numPr()
+        numpr.get_or_add_ilvl().val = level
+        numpr.get_or_add_numId().val = num_id
+
+    def styles(self):
+        from docx.enum.style import WD_STYLE_TYPE
+
+        f, ink = self.f, lambda s: _hex("ink", s)
+        rpr = self.doc.styles.element.find(self.qn("w:docDefaults")).find(self.qn("w:rPrDefault"))
+        self.fonts(rpr.find(self.qn("w:rPr")), f["regular"])
+        normal = self.style("Normal", 10.5, ink("900"), after=6)
+        normal.paragraph_format.line_spacing = 1.2
+        title = self.style("Title", 24, ink("950"), f["light"], before=18, after=2)
+        subtitle = self.style("Subtitle", 12, ink("600"), after=4)
+        if self.chapters == "A":
+            h1 = self.style("Heading 1", 13, ink("950"), f["medium"], before=16, after=6)
+        else:
+            h1 = self.style("Heading 1", 20, ink("950"), f["light"], before=0, after=18)
+            h1.paragraph_format.page_break_before = True
+        h2 = self.style("Heading 2", 11, ink("950"), f["medium"], before=12, after=4)
+        h3 = self.style("Heading 3", 10.5, ink("900"), f["medium"], before=10, after=3)
+        for st in (title, subtitle, h1, h2, h3):
+            ppr = st.element.get_or_add_pPr()
+            for tag in ("w:pBdr", "w:numPr"):
+                old = ppr.find(self.qn(tag))
+                if old is not None:
+                    ppr.remove(old)
+        for st in (h1, h2, h3):
+            st.paragraph_format.keep_with_next = True
+        self.style("Caption", 8.5, ink("600"), before=4, after=12)
+        self.style("List Bullet", 10.5, ink("900"), after=3)
+        for name, size, color in (("Header", 7.5, ink("500")), ("Footer", 7.5, ink("500"))):
+            self.style(name, size, color, after=0)
+        self.style("Byline", 9, ink("500"), after=14)
+        self.style("Subject", 11, ink("950"), f["medium"], before=14, after=10)
+        self.style("Date line", 9.5, ink("600"), before=18)
+        self.style("Sender", 8, ink("600"), after=0)
+        self.style("Memo label", 9, _hex("signal", "500"), f["medium"], after=0)
+        self.style("List Number", 10.5, ink("900"), after=3)
+        self.style("List Number 2", 10.5, ink("900"), after=3)
+        note = self.style("Note", 10, ink("700"), before=6, after=8)
+        self.border(note.element.get_or_add_pPr(), "left", _hex("signal", "500"), 18, space=8)
+        note.paragraph_format.left_indent = self.Cm(0.4)
+        shd = self.parse(
+            f'<w:shd {self.nsdecls("w")} w:val="clear" w:color="auto" w:fill="{ink("50")}"/>'
+        )
+        note.element.get_or_add_pPr().insert_element_before(shd, *_PPR_AFTER_PBDR[1:])
+        self.style("Cover title", 40, ink("950"), f["light"], before=150, after=4)
+        self.style("Cover subtitle", 16, _hex("signal", "500"), f["light"], after=24)
+        toc_head = self.style("TOC Heading", 13, ink("950"), f["medium"], before=0, after=14)
+        toc_head.paragraph_format.page_break_before = False
+        for name, size, color, face, indent in (
+            ("TOC 1", 10.5, ink("950"), f["medium"], 0),
+            ("TOC 2", 10, ink("600"), f["regular"], 0.6),
+        ):
+            st = self.style(name, size, color, face, before=4 if name == "TOC 1" else 0, after=2)
+            st.paragraph_format.left_indent = self.Cm(indent)
+            self.leader_tab(st)
+        self.tracking(self.doc.styles["Memo label"].element.get_or_add_rPr(), 2)
+        c = WD_STYLE_TYPE.CHARACTER
+        self.style("Hyperlink", color=_hex("signal", "500"), kind=c)
+        self.style("Key word", color=_hex("magma", "600"), face=f["medium"], kind=c)
+        self.numbering()
+        self.link(h1, HEADING_NUM, 0)
+        self.link(h2, HEADING_NUM, 1)
+        self.link(self.doc.styles["List Bullet"], BULLET_NUM, 0)
+        self.link(self.doc.styles["List Number"], LIST_NUM, 0)
+        self.link(self.doc.styles["List Number 2"], LIST_NUM, 1)
+        self.link(toc_head, 0, 0)  # numId 0: no number, though the style is based on Heading 1
+
+    # --- page and parts --------------------------------------------------------------------
+
+    def page(self):
+        s = self.doc.sections[0]
+        s.page_width, s.page_height = self.Cm(PAGE_W), self.Cm(PAGE_H)
+        s.top_margin = s.bottom_margin = self.Cm(2.2)
+        s.left_margin = s.right_margin = self.Cm(SIDE)
+        s.header_distance = s.footer_distance = self.Cm(1.0)
+        return s
+
+    def footer(self, part, left):
+        p = part.paragraphs[0]
+        p.style = self.doc.styles["Footer"]
+        self.right_tab(p)
+        p.add_run(left + "\t")
+        self.page_field(p)
+
+    def logo(self, paragraph, width_cm):
+        paragraph.add_run().add_picture(
+            str(assets_dir() / "fwl-logo-ink.png"), width=self.Cm(width_cm)
+        )
+
+    def para(self, text="", style="Normal"):
+        p = self.doc.add_paragraph(text, style=self.doc.styles[style])
+        return p
+
+    # --- the kinds -----------------------------------------------------------------------
+
+    def letter(self):
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        s = self.page()
+        s.different_first_page_header_footer = True
+        hdr = s.first_page_header
+        t = hdr.add_table(1, 2, self.Cm(TEXT_W))
+        self.no_borders(t)
+        self.logo(t.cell(0, 0).paragraphs[0], 3.6)
+        cell = t.cell(0, 1)
+        for i, line in enumerate(SENDER):
+            p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+            p.style = self.doc.styles["Sender"]
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            r = p.add_run(line)
+            if i == 0:
+                r.font.name = self.f["medium"]
+                r.font.color.rgb = self.RGB.from_string(_hex("ink", "900"))
+        rule = hdr.paragraphs[0]
+        rule._p.getparent().append(rule._p)  # the empty first paragraph goes below the table
+        self.border(rule._p.get_or_add_pPr(), "bottom", _hex("signal", "500"), 8)
+        for part in (s.first_page_footer, s.footer):
+            self.footer(part, LAB_LINE)
+        self.para("Groningen, 1 January 2027", "Date line")
+        self.para("Subject of the letter", "Subject")
+        self.para("Dear …,")
+        self.para("Text of the letter.")
+        self.para("Yours sincerely,").paragraph_format.space_before = self.Pt(8)
+        p = self.para("Name Surname")
+        p.paragraph_format.space_before = self.Pt(30)
+        p.runs[0].font.name = self.f["medium"]
+        self.para("Role, Forming Worlds Lab", "Sender")
+
+    def report(self):
+        s = self.page()
+        self.logo(self.para(), 2.6)
+        self.para("Title of the report", "Title")
+        self.para("Subtitle", "Subtitle")
+        byline = self.para("Name Surname  ·  Forming Worlds Lab  ·  Month Year", "Byline")
+        self.border(byline._p.get_or_add_pPr(), "bottom", _hex("signal", "500"), 8)
+        self.para("Introduction", "Heading 1")
+        p = self.para("Text of the section. Mark a ")
+        p.add_run("key word", self.doc.styles["Key word"])
+        p.add_run(" with the Key word style and a link with the Hyperlink style.")
+        self.para("Details", "Heading 2")
+        self.para("A point in a list.", "List Bullet")
+        self.para("Figure 1. Caption of the figure.", "Caption")
+        self.footer(s.footer, "Title of the report  ·  Forming Worlds Lab")
+
+    def memo(self):
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        s = self.page()
+        t = self.doc.add_table(1, 2)
+        self.no_borders(t)
+        t.cell(0, 0).paragraphs[0].style = self.doc.styles["Memo label"]
+        t.cell(0, 0).paragraphs[0].add_run("MEMO")
+        right = t.cell(0, 1).paragraphs[0]
+        right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        self.logo(right, 2.0)
+        rows = self.doc.add_table(4, 2)
+        self.no_borders(rows)
+        rows.autofit = False
+        for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
+            col.width = self.Cm(w)
+        for i, (k, v) in enumerate(
+            (
+                ("To", "Lab members"),
+                ("From", "Name Surname"),
+                ("Date", "1 January 2027"),
+                ("Subject", "Subject"),
+            )
+        ):
+            a, b = rows.cell(i, 0).paragraphs[0], rows.cell(i, 1).paragraphs[0]
+            a.style, b.style = self.doc.styles["Sender"], self.doc.styles["Normal"]
+            a.add_run(k)
+            r = b.add_run(v)
+            if k == "Subject":
+                r.font.name = self.f["medium"]
+            rows.cell(i, 0).width, rows.cell(i, 1).width = self.Cm(2.4), self.Cm(TEXT_W - 2.4)
+        rule = self.para()
+        self.border(rule._p.get_or_add_pPr(), "bottom", _hex("ink", "300"), 4)
+        self.para("Text of the memo.")
+        self.para("A point in a list.", "List Bullet")
+        self.footer(s.footer, "Forming Worlds Lab  ·  internal memo")
+
+    def handbook(self):
+        from docx.enum.text import WD_BREAK
+
+        s = self.page()
+        s.different_first_page_header_footer = True
+        self.logo(self.para(), 5.0)
+        self.para("Handbook", "Cover title")
+        self.para("Forming Worlds Lab", "Cover subtitle")
+        byline = self.para("Version  ·  Month Year", "Byline")
+        self.border(byline._p.get_or_add_pPr(), "bottom", _hex("signal", "500"), 8)
+        byline.add_run().add_break(WD_BREAK.PAGE)
+        self.para("Contents", "TOC Heading")
+        toc = self.para()
+        toc._p.append(
+            self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="begin"/></w:r>')
+        )
+        toc._p.append(
+            self.parse(
+                f'<w:r {self.nsdecls("w")}><w:instrText xml:space="preserve">'
+                ' TOC \\o "1-2" \\h \\z \\u </w:instrText></w:r>'
+            )
+        )
+        toc._p.append(
+            self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="separate"/></w:r>')
+        )
+        toc.add_run("Right-click here and choose Update Field to list the chapters.")
+        toc._p.append(
+            self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="end"/></w:r>')
+        )
+        toc.add_run().add_break(WD_BREAK.PAGE)
+        self.para("Chapter", "Heading 1")
+        self.para("Text of the chapter.")
+        self.para("Section", "Heading 2")
+        self.para("A step.", "List Number")
+        self.para("A sub-step.", "List Number 2")
+        self.para("Subsection, for example a meeting time", "Heading 3")
+        self.para("A note that stands out from the text.", "Note")
+        self.para("A point in a list.", "List Bullet")
+        self.footer(s.footer, "Forming Worlds Lab  ·  Handbook")
+
+    def save(self, out, template):
+        props = self.doc.core_properties
+        props.title, props.author, props.last_modified_by = (
+            "Forming Worlds Lab template",
+            "Forming Worlds Lab",
+            "Forming Worlds Lab",
+        )
+        props.created = props.modified = datetime(2026, 10, 19)
+        props.revision = 1
+        if template:
+            self.doc.part._content_type = TEMPLATE_CT
+        self.doc.save(str(out))
+
+
+def rpr_successors(tag):
+    """Return the rPr child tags that come after ``tag`` in schema order."""
+    order = (
+        "w:rStyle", "w:rFonts", "w:b", "w:bCs", "w:i", "w:iCs", "w:caps", "w:smallCaps",
+        "w:strike", "w:dstrike", "w:outline", "w:shadow", "w:emboss", "w:imprint",
+        "w:noProof", "w:snapToGrid", "w:vanish", "w:webHidden", "w:color", "w:spacing",
+        "w:w", "w:kern", "w:position", "w:sz", "w:szCs", "w:highlight", "w:u",
+    )  # fmt: skip
+    return order[order.index(tag) + 1 :]
+
+
+def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
+    """Write the Word templates.
+
+    Parameters
+    ----------
+    folder : str or pathlib.Path
+        Output folder; it is created when missing.
+    faces : iterable of str, optional
+        Keys of :data:`FACES`; both by default.
+    kinds : iterable of str, optional
+        Members of :data:`KINDS`; all by default.
+    template : bool, optional
+        Write ``.dotx`` templates; ``False`` writes the same content as
+        ``.docx`` documents, which Word opens for editing (used for renders).
+
+    Returns
+    -------
+    list of pathlib.Path
+        The written files, faces in the outer loop.
+
+    Raises
+    ------
+    ImportError
+        When ``python-docx`` is missing.
+    ValueError
+        When a face or kind is unknown.
+    """
+    try:
+        import docx
+    except ImportError as err:
+        raise ImportError(
+            'the Word templates need python-docx: pip install "fwl-visual-language[word]"'
+        ) from err
+    faces, kinds = list(faces), list(kinds)
+    bad = [f for f in faces if f not in FACES] + [k for k in kinds if k not in KINDS]
+    if bad:
+        raise ValueError(f"unknown face or kind: {bad}; faces {list(FACES)}, kinds {list(KINDS)}")
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for face in faces:
+        for kind in kinds:
+            b = _Builder(face, docx, "B" if kind == "handbook" else "A")
+            b.styles()
+            getattr(b, kind)()
+            out = folder / f"{template_name(kind, face)}.{'dotx' if template else 'docx'}"
+            b.save(out, template)
+            written.append(out)
+    return written
+
+
+def main(argv=None):
+    """Command line entry point: ``python -m fwl_visual_language.word FOLDER``."""
+    parser = argparse.ArgumentParser(
+        prog="python -m fwl_visual_language.word",
+        description="Write the Forming Worlds Lab Word templates (.dotx).",
+    )
+    parser.add_argument("folder", help="output folder")
+    parser.add_argument("--face", choices=[*FACES, "all"], default="all")
+    parser.add_argument("--docx", action="store_true", help="write .docx documents, not templates")
+    args = parser.parse_args(argv)
+    faces = list(FACES) if args.face == "all" else [args.face]
+    for path in build_word(args.folder, faces, template=not args.docx):
+        print(path)
+
+
+if __name__ == "__main__":
+    main()

@@ -57,6 +57,14 @@ The built files are in `templates/`: `Forming Worlds.pptx` for PowerPoint and Go
 
 In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom left corner and `\slideref{key}[right]` in the bottom right one; one call can take several keys; an unknown key prints the key itself. `\fwljournal{name in the .bib}{name on the slide}` adds a journal name to the list that maps, for example, `Mon. Not. R. Astron. Soc.` to `MNRAS`; the common ADS journal macros (`\mnras`, `\apjl`, ...) are defined at `\begin{document}` where the preamble defines none. `\fwlhl{word}` sets a key word in magma-400, also as `\hl` when the preamble (for example `soul`) defines no `\hl`. Put `\slideref` inside a frame; the title and closing frames keep their bottom right corner for the logo. The frames are `\titleframe`, `\questionframe[sub-question]{question}`, `\sectionframe{label}{statement}`, `\figureframe{title}{side text}{image}`, `\statementframe{text}`, `\closingframe[announcement]{statement}`, ordinary frames, and `[statement]` frames on ink-980. `[plain]` frames have no reference corners. Compile with `lualatex`, `bibtex`, then `lualatex` twice.
 
+## Word
+
+`python -m fwl_visual_language.word templates` writes Word templates for 4 kinds of document, each in 2 faces: `Forming Worlds Letter`, `Report`, `Memo` and `Handbook`, in Geist for documents that leave as PDF and in Aptos, the Office default, for documents that others edit without the lab fonts. The built `.dotx` files are in `templates/`, and a test checks that each one matches a fresh build.
+
+Every format sits in a named style: Normal, Title, Subtitle, Heading 1 to 3 (Heading 1 and 2 numbered, with the numbers in signal blue), Caption, List Bullet, List Number and List Number 2, Note, Key word (magma), Hyperlink and the contents styles, so typed text keeps the lab look. The letter has the logo and the sender block on its first page; the handbook has a cover, a contents field (right-click it and choose Update Field) and chapters that start on a new page.
+
+Export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service that has no Geist and puts Calibri and Cambria in its place. Geist must be installed on the computer; current versions of Microsoft Office include Aptos.
+
 ## Develop
 
 ```bash

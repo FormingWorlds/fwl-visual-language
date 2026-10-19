@@ -64,13 +64,14 @@ def fonts_dir():
 
 
 def assets_dir():
-    """Return the folder that holds the lab logo (``fwl-logo-white.svg`` and ``.png``).
+    """Return the folder that holds the lab logo, white and ink, as ``.svg`` and ``.png``.
 
     Returns
     -------
     pathlib.Path
-        Folder with the white logo of formingworlds.space and a 1200 px wide
-        rendering of it for slides.
+        Folder with the white logo of formingworlds.space for dark grounds,
+        the ink version for paper (the white letters in ink-950), and a
+        1200 px wide rendering of each.
     """
     return HERE / "assets"
 
