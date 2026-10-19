@@ -161,3 +161,15 @@ def test_the_iwa_reader_decodes_literals_and_overlapping_copies():
         iwa(b"\1abc")
     with pytest.raises(AssertionError, match="bad snappy offset"):
         _snappy(bytes([5, 0 << 2]) + b"a" + bytes([0 << 2 | 1, 0]))
+
+
+def test_the_keynote_theme_carries_the_neutral_sample_references():
+    with zipfile.ZipFile(KTH) as z:
+        text = b"".join(
+            iwa(z.read(n)) if n.endswith(".iwa") else z.read(n)
+            for n in z.namelist()
+            if n.endswith((".iwa", ".plist")) or n.startswith("Metadata/")
+        )
+    assert not re.search(rb"Lichtenberg|Miguel|Teske|Nicholls|Treatise", text, re.I)
+    for ref in (b"Author+ 25 ", b"Author+ 24 ", b"Author & Author 25 ", b"Author+ 26a "):
+        assert ref in text, ref  # the sample slides of the current source
