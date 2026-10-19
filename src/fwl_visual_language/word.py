@@ -1,5 +1,8 @@
 """Word templates for letters, reports, memos and handbooks, written as ``.dotx`` files.
 
+There are two letters: one with the lab letterhead and one with the banner of the
+University of Groningen and the lab logo in the footer; both justify their text.
+
 The handbook, for long internal documents, has a cover, a contents field and
 chapters that start on a new page; the report keeps its chapters in the text
 flow. Each kind comes in two faces: Geist, for documents that leave as PDF, and
@@ -27,7 +30,7 @@ FACES = {
     "geist": {"regular": "Geist", "light": "Geist Light", "medium": "Geist Medium"},
     "aptos": {"regular": "Aptos", "light": "Aptos Light", "medium": "Aptos SemiBold"},
 }
-KINDS = ("letter", "report", "memo", "handbook")
+KINDS = ("letter", "university-letter", "report", "memo", "handbook")
 TEMPLATE_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml"
 PAGE_W, PAGE_H, SIDE = 21.0, 29.7, 2.2  # cm
 TEXT_W = PAGE_W - 2 * SIDE
@@ -73,7 +76,7 @@ def template_name(kind, face):
     str
         The name without extension.
     """
-    return f"Forming Worlds {kind.capitalize()} ({face.capitalize()})"
+    return f"Forming Worlds {kind.replace('-', ' ').title()} ({face.capitalize()})"
 
 
 class _Builder:
@@ -289,7 +292,7 @@ class _Builder:
             f'<w:shd {self.nsdecls("w")} w:val="clear" w:color="auto" w:fill="{ink("50")}"/>'
         )
         note.element.get_or_add_pPr().insert_element_before(shd, *_PPR_AFTER_PBDR[1:])
-        self.style("Cover title", 40, ink("950"), f["light"], before=150, after=4)
+        self.style("Cover title", 40, ink("950"), f["light"], before=110, after=4)
         self.style("Cover subtitle", 16, _hex("signal", "500"), f["light"], after=24)
         toc_head = self.style("TOC Heading", 13, ink("950"), f["medium"], before=0, after=14)
         toc_head.paragraph_format.page_break_before = False
@@ -363,6 +366,38 @@ class _Builder:
         self.border(rule._p.get_or_add_pPr(), "bottom", _hex("signal", "500"), 8)
         for part in (s.first_page_footer, s.footer):
             self.footer(part, LAB_LINE)
+        self.letter_body()
+
+    def university_letter(self):
+        """The university banner on page 1, the lab logo and the page number in the footer."""
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        s = self.page()
+        s.different_first_page_header_footer = True
+        hdr = s.first_page_header
+        banner = hdr.paragraphs[0]
+        banner.add_run().add_picture(str(assets_dir() / "rug-banner.png"), width=self.Cm(TEXT_W))
+        sender = hdr.add_paragraph(style=self.doc.styles["Sender"])
+        sender.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        sender.paragraph_format.space_before = self.Pt(10)
+        r = sender.add_run(SENDER[0])
+        r.font.name = self.f["medium"]
+        r.font.color.rgb = self.RGB.from_string(_hex("ink", "900"))
+        sender.add_run(f"  ·  {SENDER[-1]}")
+        for part in (s.first_page_footer, s.footer):
+            p = part.paragraphs[0]
+            p.style = self.doc.styles["Footer"]
+            self.right_tab(p)
+            self.logo(p, 2.0)
+            p.add_run("\t")
+            self.page_field(p)
+        self.letter_body()
+
+    def letter_body(self):
+        """Date, subject, salutation, text and signature; the text is justified."""
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+        self.doc.styles["Normal"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         self.para("Groningen, 1 January 2027", "Date line")
         self.para("Subject of the letter", "Subject")
         self.para("Dear …,")
@@ -436,7 +471,9 @@ class _Builder:
         self.para("Forming Worlds Lab", "Cover subtitle")
         byline = self.para("Version  ·  Month Year", "Byline")
         self.border(byline._p.get_or_add_pPr(), "bottom", _hex("signal", "500"), 8)
-        byline.add_run().add_break(WD_BREAK.PAGE)
+        self.para("Opening line of the welcome:", "Subject")
+        welcome = self.para("A short welcome that says what the handbook is for and how to use it.")
+        welcome.add_run().add_break(WD_BREAK.PAGE)
         self.para("Contents", "TOC Heading")
         toc = self.para()
         toc._p.append(
@@ -536,7 +573,7 @@ def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
         for kind in kinds:
             b = _Builder(face, docx, "B" if kind == "handbook" else "A")
             b.styles()
-            getattr(b, kind)()
+            getattr(b, kind.replace("-", "_"))()
             out = folder / f"{template_name(kind, face)}.{'dotx' if template else 'docx'}"
             b.save(out, template)
             written.append(out)

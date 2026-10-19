@@ -24,10 +24,8 @@ FACE = {
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     d = tmp_path_factory.mktemp("word")
-    return {
-        (p.stem.split()[2].lower(), p.stem.split("(")[1][:-1].lower()): p
-        for p in word.build_word(d)
-    }
+    paths = iter(word.build_word(d))
+    return {(k, f): next(paths) for f in word.FACES for k in word.KINDS}
 
 
 def part(path, name):
@@ -197,7 +195,9 @@ def test_handbook_has_cover_contents_field_and_note(built):
     doc = part(path, "word/document.xml")
     paras = doc.findall(".//w:body/w:p", NS)
     styles = [val(p, "pStyle") for p in paras]
-    assert styles[1:4] == ["Covertitle", "Coversubtitle", "Byline"]
+    assert styles[1:6] == ["Covertitle", "Coversubtitle", "Byline", "Subject", None]
+    breaks = [i for i, p in enumerate(paras) if p.find(".//w:br[@w:type='page']", NS) is not None]
+    assert breaks[0] == 5  # the welcome stays on the cover; the contents start on page 2
     assert {
         "TOCHeading",
         "Heading1",
@@ -273,12 +273,12 @@ def test_command_line_and_module_run(tmp_path, capsys, monkeypatch):
     word.main([str(tmp_path / "cli"), "--face", "aptos", "--docx"])
     out = capsys.readouterr().out.split("\n")
     assert sorted(p.name for p in (tmp_path / "cli").iterdir()) == sorted(
-        f"Forming Worlds {k.capitalize()} (Aptos).docx" for k in word.KINDS
+        f"{word.template_name(k, 'aptos')}.docx" for k in word.KINDS
     )
-    assert len([line for line in out if line]) == 4
+    assert len([line for line in out if line]) == len(word.KINDS)
     monkeypatch.setattr(sys, "argv", ["word", str(tmp_path / "mod")])
     runpy.run_module("fwl_visual_language.word", run_name="__main__")
-    assert len(list((tmp_path / "mod").glob("*.dotx"))) == 8
+    assert len(list((tmp_path / "mod").glob("*.dotx"))) == 2 * len(word.KINDS)
 
 
 def test_the_committed_templates_match_a_fresh_build(tmp_path):
@@ -333,7 +333,9 @@ def test_every_template_embeds_the_ink_logo(built):
     for path in built.values():
         with zipfile.ZipFile(path) as z:
             media = [z.read(n) for n in z.namelist() if n.startswith("word/media/")]
-        assert media and all(m == ink for m in media), path.name
+        banner = (assets_dir() / "rug-banner.png").read_bytes()
+        expect = {ink, banner} if "University" in path.name else {ink}
+        assert media and set(media) == expect, path.name
 
 
 def test_numbers_point_at_their_lists_and_borders_are_stripped(built):
@@ -416,7 +418,7 @@ def test_styles_set_their_spacing_and_indents(built):
         "Caption": ("80", "240", "240", None),
         "Note": ("120", "160", None, "227"),
         "TOC2": ("0", "40", None, "340"),
-        "Covertitle": ("3000", "80", None, None),
+        "Covertitle": ("2200", "80", None, None),
     }
     assert {sid: spacing(style(path, sid)) for sid in expect} == expect
     assert spacing(style(built["report", "geist"], "Heading1"))[:2] == ("320", "120")
@@ -429,6 +431,7 @@ def test_styles_set_their_spacing_and_indents(built):
         ("report", "Title of the report  ·  Forming Worlds Lab", False),
         ("memo", "Forming Worlds Lab  ·  internal memo", False),
         ("handbook", "Forming Worlds Lab  ·  Handbook", True),
+        ("university-letter", "", True),
     ],
 )
 def test_each_kind_has_its_footer_and_first_page_setting(built, kind, left, first_page):
@@ -483,3 +486,35 @@ def test_tables_have_no_borders_and_the_sender_block_its_style(built):
     }
     assert fonts(lines[0].find("w:r", NS))["ascii"] == "Geist Medium"
     assert doc is not None
+
+
+def test_letters_justify_their_text_and_the_other_kinds_do_not(built):
+    for (kind, face), path in built.items():
+        jc = val(style(path, "Normal"), "jc")
+        assert jc == ("both" if "letter" in kind else None), (kind, face)
+
+
+def test_the_university_letter_has_the_banner_and_the_lab_logo_in_the_footer(built):
+    path = built["university-letter", "aptos"]
+    assert path.name == "Forming Worlds University Letter (Aptos).dotx"
+    with zipfile.ZipFile(path) as z:
+        parts = {
+            n: etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/(header|footer)\d+\.xml", n)
+        }
+        rels = {
+            n: z.read(n)
+            for n in z.namelist()
+            if re.fullmatch(r"word/_rels/(header|footer)\d+\.xml\.rels", n)
+        }
+    headers = [x for n, x in parts.items() if "header" in n and x.find(".//{*}blip") is not None]
+    assert len(headers) == 1
+    sender = headers[0].findall("w:p", NS)[-1]
+    assert "".join(sender.itertext()) == f"{word.SENDER[0]}  ·  {word.SENDER[-1]}"
+    assert (val(sender, "pStyle"), val(sender, "jc")) == ("Sender", "right")
+    footers = [
+        x for n, x in parts.items() if "footer" in n and x.find(".//w:fldSimple", NS) is not None
+    ]
+    assert len(footers) == 2 and all(f.find(".//{*}blip") is not None for f in footers)
+    assert len(rels) == 3  # 1 header and 2 footers point at an image
