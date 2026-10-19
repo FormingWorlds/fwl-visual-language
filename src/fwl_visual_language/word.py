@@ -22,7 +22,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from . import assets_dir, ramp
+from . import assets_dir, palette, ramp
 
 __all__ = ["FACES", "KINDS", "build_word", "template_name"]
 
@@ -196,7 +196,7 @@ class _Builder:
         return st
 
     def theme(self):
-        """Point the theme fonts (+Headings, +Body in Word's font menu) at the face."""
+        """Point the theme fonts and colours at the face and the paper palette."""
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from lxml import etree
 
@@ -207,6 +207,13 @@ class _Builder:
         scheme.set("name", "Forming Worlds Lab")
         for tag, face in (("majorFont", self.f["medium"]), ("minorFont", self.f["regular"])):
             scheme.find(f"{a}{tag}/{a}latin").set("typeface", face)
+        colours = root.find(f".//{a}clrScheme")
+        colours.set("name", "Forming Worlds Lab")
+        for key, value in theme_colours().items():
+            el = colours.find(f"{a}{key}")
+            for child in list(el):
+                el.remove(child)
+            etree.SubElement(el, f"{a}srgbClr", val=value)
         part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
     def numbering(self):
@@ -536,6 +543,32 @@ class _Builder:
         if template:
             self.doc.part._content_type = TEMPLATE_CT
         self.doc.save(str(out))
+
+
+def theme_colours():
+    """Return the theme colours of the Word templates: ink and white, then the paper palette.
+
+    Returns
+    -------
+    dict
+        ``dk1``, ``lt1``, ``dk2``, ``lt2``, ``accent1`` to ``accent6``,
+        ``hlink`` and ``folHlink`` as 6-digit hex without ``#``.
+    """
+    paper = {name: hexv.lstrip("#") for name, hexv in palette("paper")}
+    return {
+        "dk1": _hex("ink", "900"),
+        "lt1": "FFFFFF",
+        "dk2": _hex("ink", "700"),
+        "lt2": _hex("ink", "50"),
+        "accent1": paper["magma"],
+        "accent2": paper["signal"],
+        "accent3": paper["fern"],
+        "accent4": paper["ochre"],
+        "accent5": paper["iris"],
+        "accent6": paper["garnet"],
+        "hlink": _hex("signal", "500"),
+        "folHlink": _hex("signal", "700"),
+    }
 
 
 def rpr_successors(tag):

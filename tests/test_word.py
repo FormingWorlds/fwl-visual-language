@@ -594,3 +594,17 @@ def test_the_theme_fonts_are_the_face(built):
         minor = scheme.find(f"{a}minorFont/{a}latin").get("typeface")
         assert (major, minor) == (FACE[face][2], FACE[face][0]), (kind, face)
         assert scheme.get("name") == "Forming Worlds Lab"
+
+
+def test_the_theme_colours_are_the_paper_palette(built):
+    a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    expect = {
+        "dk1": "03090F", "lt1": "FFFFFF", "dk2": "2A343C", "lt2": "F3F6F9",
+        "accent1": "B74B21", "accent2": "0072A1", "accent3": "20A976", "accent4": "BC8D03",
+        "accent5": "4E2585", "accent6": "741721", "hlink": "0072A1", "folHlink": "003E60",
+    }  # fmt: skip
+    for (kind, face), path in built.items():
+        scheme = part(path, "word/theme/theme1.xml").find(f".//{a}clrScheme")
+        got = {k: [c.get("val") for c in scheme.find(f"{a}{k}")] for k in expect}
+        assert got == {k: [v] for k, v in expect.items()}, (kind, face)
+        assert scheme.get("name") == "Forming Worlds Lab"
