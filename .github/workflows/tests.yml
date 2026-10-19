@@ -49,7 +49,7 @@ jobs:
       - name: Run the tests against the installed package
         run: |
           mkdir ../wheeltest
-          cp -R tests themes ../wheeltest/
+          cp -R tests themes templates ../wheeltest/
           cd ../wheeltest
           python -c "import fwl_visual_language as f, sys; assert 'site-packages' in f.__file__, f.__file__"
           pytest -q tests
