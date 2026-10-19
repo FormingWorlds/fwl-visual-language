@@ -35,6 +35,10 @@ TEMPLATE_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.te
 PAGE_W, PAGE_H, SIDE = 21.0, 29.7, 2.2  # cm
 TEXT_W = PAGE_W - 2 * SIDE
 HEADING_NUM, BULLET_NUM, LIST_NUM = 90, 91, 92
+LEFT_IN_LETTERS = (
+    "Title", "Subtitle", "Heading 1", "Heading 2", "Heading 3", "Subject", "Date line",
+    "Sender", "Byline", "Caption", "Header", "Footer", "TOC Heading", "TOC 1", "TOC 2",
+)  # fmt: skip
 LAB_LINE = "Forming Worlds Lab  ·  Kapteyn Astronomical Institute  ·  University of Groningen"
 SENDER = (
     "Name Surname",
@@ -398,6 +402,8 @@ class _Builder:
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
         self.doc.styles["Normal"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        for name in LEFT_IN_LETTERS:  # styles based on Normal that must not stretch a wrapped line
+            self.doc.styles[name].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
         self.para("Groningen, 1 January 2027", "Date line")
         self.para("Subject of the letter", "Subject")
         self.para("Dear …,")

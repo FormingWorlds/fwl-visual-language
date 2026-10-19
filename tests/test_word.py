@@ -24,8 +24,10 @@ FACE = {
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     d = tmp_path_factory.mktemp("word")
-    paths = iter(word.build_word(d))
-    return {(k, f): next(paths) for f in word.FACES for k in word.KINDS}
+    written = word.build_word(d)
+    built = {(k, f): d / f"{word.template_name(k, f)}.dotx" for f in word.FACES for k in word.KINDS}
+    assert sorted(written) == sorted(built.values())
+    return built
 
 
 def part(path, name):
@@ -58,8 +60,11 @@ def texts(path):
 
 
 def test_every_kind_and_face_is_a_template_with_the_lab_name(built):
-    assert sorted(built) == sorted((k, f) for k in word.KINDS for f in word.FACES)
-    assert built["letter", "geist"].name == "Forming Worlds Letter (Geist).dotx"
+    names = sorted(p.name for p in built.values())
+    kinds = ("Letter", "University Letter", "Report", "Memo", "Handbook")
+    assert names == sorted(
+        f"Forming Worlds {k} ({f}).dotx" for k in kinds for f in ("Geist", "Aptos")
+    )
     for path in built.values():
         types = part(path, "[Content_Types].xml")
         doc = [o for o in types if o.get("PartName") == "/word/document.xml"]
@@ -195,9 +200,12 @@ def test_handbook_has_cover_contents_field_and_note(built):
     doc = part(path, "word/document.xml")
     paras = doc.findall(".//w:body/w:p", NS)
     styles = [val(p, "pStyle") for p in paras]
-    assert styles[1:6] == ["Covertitle", "Coversubtitle", "Byline", "Subject", None]
     breaks = [i for i, p in enumerate(paras) if p.find(".//w:br[@w:type='page']", NS) is not None]
-    assert breaks[0] == 5  # the welcome stays on the cover; the contents start on page 2
+    toc_head = styles.index("TOCHeading")
+    assert breaks == [toc_head - 1, toc_head + 1]  # after the cover and after the contents
+    cover = styles[: breaks[0] + 1]
+    assert cover[1:4] == ["Covertitle", "Coversubtitle", "Byline"] and "Heading1" not in cover
+    assert "".join(paras[breaks[0]].itertext()).strip()  # the welcome text ends the cover
     assert {
         "TOCHeading",
         "Heading1",
@@ -490,8 +498,11 @@ def test_tables_have_no_borders_and_the_sender_block_its_style(built):
 
 def test_letters_justify_their_text_and_the_other_kinds_do_not(built):
     for (kind, face), path in built.items():
-        jc = val(style(path, "Normal"), "jc")
-        assert jc == ("both" if "letter" in kind else None), (kind, face)
+        letter = kind in ("letter", "university-letter")
+        assert val(style(path, "Normal"), "jc") == ("both" if letter else None), (kind, face)
+        for name in word.LEFT_IN_LETTERS:
+            sid = name.replace(" ", "")
+            assert val(style(path, sid), "jc") == ("left" if letter else None), (kind, sid)
 
 
 def test_the_university_letter_has_the_banner_and_the_lab_logo_in_the_footer(built):
@@ -518,3 +529,58 @@ def test_the_university_letter_has_the_banner_and_the_lab_logo_in_the_footer(bui
     ]
     assert len(footers) == 2 and all(f.find(".//{*}blip") is not None for f in footers)
     assert len(rels) == 3  # 1 header and 2 footers point at an image
+
+
+def test_the_banner_asset_is_the_red_university_banner():
+    import numpy as np
+    from PIL import Image
+
+    with Image.open(assets_dir() / "rug-banner.png") as im:
+        a = np.asarray(im.convert("RGBA")).astype(int)
+    assert a.shape[:2] == (229, 2400)
+    ink = a[(a[..., 3] > 200) & (a[..., :3].min(axis=2) < 200)]
+    red = ink[:, 0] - np.maximum(ink[:, 1], ink[:, 2]) > 50  # anti-aliased edges are pink
+    assert len(ink) > 10_000 and red.mean() > 0.95
+
+
+def test_the_university_letter_places_banner_and_logo_by_page(built):
+    rid = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+    ink = (assets_dir() / "fwl-logo-ink.png").read_bytes()
+    banner = (assets_dir() / "rug-banner.png").read_bytes()
+    for face in word.FACES:
+        path = built["university-letter", face]
+        with zipfile.ZipFile(path) as z:
+            doc = etree.fromstring(z.read("word/document.xml"))
+            rels = {
+                r.get("Id"): r.get("Target")
+                for r in etree.fromstring(z.read("word/_rels/document.xml.rels"))
+            }
+            sect = doc.find(".//w:body/w:sectPr", NS)
+            assert sect.find("w:titlePg", NS) is not None
+
+            def images(ref, z=z, rels=rels):
+                name = rels[ref.get(rid)]
+                x = etree.fromstring(z.read(f"word/{name}"))
+                prels = (
+                    {
+                        r.get("Id"): r.get("Target")
+                        for r in etree.fromstring(z.read(f"word/_rels/{name}.rels"))
+                    }
+                    if f"word/_rels/{name}.rels" in z.namelist()
+                    else {}
+                )
+                blips = [
+                    b.get(
+                        "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
+                    )
+                    for b in x.iter("{*}blip")
+                ]
+                return x, [z.read("word/" + prels[b]) for b in blips]
+
+            heads = {h.get(f"{W}type"): images(h) for h in sect.findall("w:headerReference", NS)}
+            feet = {f.get(f"{W}type"): images(f) for f in sect.findall("w:footerReference", NS)}
+        assert heads["first"][1] == [banner], face
+        assert "default" not in heads or heads["default"][1] == [], face
+        for kind in ("first", "default"):
+            x, imgs = feet[kind]
+            assert imgs == [ink] and x.find(".//w:fldSimple", NS) is not None, (face, kind)
