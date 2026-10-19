@@ -40,7 +40,7 @@ The website's light theme reassigns the ramp steps instead of changing classes. 
 
 The slide masters are a PowerPoint file with 10 layouts (`Title`, `Question`, `Section`, `Figure`, `Figure, large`, `Two figures`, `Summary`, `Statement`, `Team`, `Closing`), a Keynote source made from the same layouts, and a beamer theme with frames for the title, a question, a section, a figure, a statement and the closing slide. Every slide sits on the ink-950 ground (statements on ink-980) and takes figures in the dark figure style; the masters have no background picture, so a talk can add its own. Titles are one line of Geist Light. Key words take magma-400.
 
-Every content layout has 2 reference boxes, bottom left and bottom right, in 24 pt on the 1920 x 1080 design. A box is anchored at its base, so several references stack upward and never run off the slide. The format is `Teske+ 25 ApJL`: 1 or 2 family names (`Lichtenberg & Miguel 25`) with any prefix such as `van`, else the first plus `+` (also for `and others`), a 2-digit year with the letter that tells papers of one author and year apart (`Smith 25a`, `Smith 25b`), and the journal in italics.
+Every figure layout has 2 reference boxes, bottom left and bottom right, in 24 pt on the 1920 x 1080 design; the Summary layout has one reference box per point. A box is anchored at its base, so several references stack upward and never run off the slide. The format is `Teske+ 25 ApJL`: 1 or 2 family names (`Lichtenberg & Miguel 25`) with any prefix such as `van`, else the first plus `+` (also for `and others`), a 2-digit year with the letter that tells papers of one author and year apart (`Smith 25a`, `Smith 25b`), and the journal in italics.
 
 ```bash
 pip install "fwl-visual-language[slides]"

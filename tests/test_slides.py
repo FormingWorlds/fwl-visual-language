@@ -159,13 +159,34 @@ def test_samples_have_no_personal_content(built):
     )
     assert "SPEAKER NAME" in text and "Venue, city" in text
     assert not re.search(r"\bTim\b|TIM LICHTENBERG|Leuven", text)
+
+
+REAL_NAMES = re.compile(rb"Lichtenberg|Miguel|Teske|Nicholls|Treatise", re.I)
+SAMPLE_REF = re.compile(r"Author( & Author|\+) \d\d([a-z](,[a-z])?)?( \S.*)?")
+
+
+@pytest.mark.parametrize("key", ["pptx", "keynote", "plain"])
+def test_sample_references_are_neutral_in_every_part(built, key):
+    with zipfile.ZipFile(built[key]) as z:
+        names = z.namelist()
+        hits = [n for n in names if n.endswith((".xml", ".rels")) and REAL_NAMES.search(z.read(n))]
+    assert hits == []
+    assert not [n for n in names if "notesSlide" in n or "notesMaster" in n]
+    prs = Presentation(built[key])
+    assert (prs.core_properties.author, prs.core_properties.last_modified_by) == (
+        "Forming Worlds Lab",
+        "Forming Worlds Lab",
+    )
     refs = [
-        sh.text_frame.text
+        para.text
         for s in prs.slides
         for sh in s.placeholders
-        if sh.placeholder_format.idx in (20, 21) and sh.text_frame.text
+        if sh.placeholder_format.idx in (11, 12, 13, 14, 20, 21)
+        for para in sh.text_frame.paragraphs
+        if para.text
     ]
-    assert len(refs) == 4 and all(r.startswith("Author") for r in refs), refs
+    assert len(refs) == 8, refs  # 4 corner references on figure slides, 4 on the summary
+    assert all(SAMPLE_REF.fullmatch(r) for r in refs), refs
 
 
 def test_more_layouts_than_the_base_template_has_are_refused(tmp_path, monkeypatch):
