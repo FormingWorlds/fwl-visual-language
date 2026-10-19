@@ -37,7 +37,11 @@ def content_hash(path):
 
 def recorded_hashes():
     """Return the hashes in ``keynote-source.sha256`` by label (``source``, ``kth``)."""
-    rows = dict(line.split()[::-1] for line in HASHES.read_text().splitlines() if line.strip())
+    rows = {}
+    for line in filter(str.strip, HASHES.read_text().splitlines()):
+        fields = line.split()
+        assert len(fields) == 2 and fields[1] not in rows, f"{HASHES.name}: bad line {line!r}"
+        rows[fields[1]] = fields[0]
     assert sorted(rows) == ["kth", "source"], f"{HASHES.name} needs a source and a kth line"
     assert all(re.fullmatch("[0-9a-f]{64}", h) for h in rows.values()), rows
     return rows
@@ -77,6 +81,7 @@ def _snappy(b):
         else:
             w = 2 if kind == 2 else 4
             n, off, i = (tag >> 2) + 1, int.from_bytes(b[i : i + w], "little"), i + w
+        assert 0 < off <= len(out), "bad snappy offset"
         for _ in range(n):  # a copy may overlap its own output
             out.append(out[-off])
     assert len(out) == size
@@ -117,8 +122,8 @@ def test_the_builder_still_writes_the_keynote_source_of_the_theme(tmp_path):
 def test_the_keynote_theme_is_the_one_recorded_with_its_source():
     new = hashlib.sha256(KTH.read_bytes()).hexdigest()
     assert new == recorded_hashes()["kth"], (
-        f"{KTH.name} is not the theme recorded in {HASHES.name}: {REMAKE_KTH} "
-        f"and write both hashes there (kth {new})"
+        f"{KTH.name} is not the theme recorded in {HASHES.name}: {REMAKE_KTH}, "
+        f"then write kth {new} there"
     )
 
 
@@ -143,6 +148,9 @@ def test_the_iwa_reader_decodes_literals_and_overlapping_copies():
     block = bytes([10, 2 << 2]) + b"abc" + bytes([(7 - 4) << 2 | 1, 3])
     chunk = b"\0" + len(block).to_bytes(3, "little") + block
     assert iwa(chunk) == b"abcabcabca"
+    assert iwa(chunk + chunk) == b"abcabcabca" * 2
+    # A copy with a 2-byte offset.
+    assert _snappy(bytes([5, 0 << 2]) + b"x" + bytes([(4 - 1) << 2 | 2, 1, 0])) == b"xxxxx"
     # A 300-byte literal (length in 2 bytes), then 5 bytes copied from offset 260.
     text = bytes(range(256)) + bytes(range(44))
     block = _varint(305) + bytes([61 << 2]) + (299).to_bytes(2, "little") + text
@@ -151,3 +159,5 @@ def test_the_iwa_reader_decodes_literals_and_overlapping_copies():
     assert _varint(5) == b"\x05" and _varint(300) == b"\xac\x02"
     with pytest.raises(AssertionError, match="not an iwa chunk"):
         iwa(b"\1abc")
+    with pytest.raises(AssertionError, match="bad snappy offset"):
+        _snappy(bytes([5, 0 << 2]) + b"a" + bytes([0 << 2 | 1, 0]))
