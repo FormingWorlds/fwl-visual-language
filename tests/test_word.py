@@ -294,3 +294,103 @@ def test_the_committed_templates_match_a_fresh_build(tmp_path):
         assert differ == [], (
             f"{name}: {differ} differ; rebuild with: python -m fwl_visual_language.word templates"
         )
+
+
+ORDER = {
+    "tblPr": ["tblStyle", "tblpPr", "tblOverlap", "bidiVisual", "tblStyleRowBandSize",
+              "tblStyleColBandSize", "tblW", "jc", "tblCellSpacing", "tblInd", "tblBorders",
+              "shd", "tblLayout", "tblCellMar", "tblLook", "tblCaption", "tblDescription"],
+    "pPr": ["pStyle", "keepNext", "keepLines", "pageBreakBefore", "framePr", "widowControl",
+            "numPr", "suppressLineNumbers", "pBdr", "shd", "tabs", "suppressAutoHyphens",
+            "kinsoku", "wordWrap", "overflowPunct", "topLinePunct", "autoSpaceDE", "autoSpaceDN",
+            "bidi", "adjustRightInd", "snapToGrid", "spacing", "ind", "contextualSpacing",
+            "mirrorIndents", "suppressOverlap", "jc", "textDirection", "textAlignment",
+            "textboxTightWrap", "outlineLvl", "divId", "cnfStyle", "rPr", "sectPr", "pPrChange"],
+    "rPr": ["rStyle", "rFonts", "b", "bCs", "i", "iCs", "caps", "smallCaps", "strike", "dstrike",
+            "outline", "shadow", "emboss", "imprint", "noProof", "snapToGrid", "vanish",
+            "webHidden", "color", "spacing", "w", "kern", "position", "sz", "szCs", "highlight",
+            "u", "effect", "bdr", "shd", "fitText", "vertAlign", "rtl", "cs", "em", "lang",
+            "eastAsianLayout", "specVanish", "oMath"],
+}  # fmt: skip
+
+
+def test_property_children_keep_the_schema_order(built):
+    for path in built.values():
+        with zipfile.ZipFile(path) as z:
+            names = [n for n in z.namelist() if re.fullmatch(r"word/[a-z0-9]+\.xml", n)]
+            roots = {n: etree.fromstring(z.read(n)) for n in names}
+        for name, root in roots.items():
+            for tag, order in ORDER.items():
+                for el in root.iter(f"{W}{tag}"):
+                    kids = [c.tag.split("}")[1] for c in el if c.tag.startswith(W)]
+                    pos = [order.index(k) for k in kids if k in order]
+                    assert pos == sorted(pos), (path.name, name, tag, kids)
+
+
+def test_every_template_embeds_the_ink_logo(built):
+    ink = (assets_dir() / "fwl-logo-ink.png").read_bytes()
+    for path in built.values():
+        with zipfile.ZipFile(path) as z:
+            media = [z.read(n) for n in z.namelist() if n.startswith("word/media/")]
+        assert media and all(m == ink for m in media), path.name
+
+
+def test_numbers_point_at_their_lists_and_borders_are_stripped(built):
+    path = built["handbook", "geist"]
+    numbering = part(path, "word/numbering.xml")
+    nums = {n.get(f"{W}numId"): val(n, "abstractNumId") for n in numbering.findall("w:num", NS)}
+    assert {k: nums[k] for k in ("90", "91", "92")} == {"90": "90", "91": "91", "92": "92"}
+    assert len(nums) == len(numbering.findall("w:num", NS))
+    absn = {a.get(f"{W}abstractNumId"): a for a in numbering.findall("w:abstractNum", NS)}
+    fmts = {
+        k: [val(lv, "numFmt") for lv in absn[k].findall("w:lvl", NS)] for k in ("90", "91", "92")
+    }
+    assert fmts == {
+        "90": ["decimal", "decimal"],
+        "91": ["bullet"],
+        "92": ["decimal", "lowerLetter"],
+    }
+    for sid in ("Title", "Subtitle", "Heading3"):
+        s = style(path, sid)
+        assert s.find(".//w:pBdr", NS) is None and s.find(".//w:numPr", NS) is None, sid
+    for sid in ("Heading1", "Heading2", "Heading3"):
+        assert style(path, sid).find(".//w:keepNext", NS) is not None, sid
+
+
+def test_pages_are_a4_with_the_lab_margins(built):
+    for path in built.values():
+        sect = part(path, "word/document.xml").find(".//w:body/w:sectPr", NS)
+        size, mar = sect.find("w:pgSz", NS), sect.find("w:pgMar", NS)
+        assert (size.get(f"{W}w"), size.get(f"{W}h")) == ("11906", "16838"), path.name
+        sides = [mar.get(f"{W}{k}") for k in ("top", "bottom", "left", "right")]
+        assert sides == ["1247"] * 4, path.name
+        assert part(path, "docProps/core.xml").find("{*}description") is None or not (
+            part(path, "docProps/core.xml").find("{*}description").text
+        )
+
+
+@pytest.mark.parametrize(
+    "sid, face, size, color",
+    [
+        ("Header", 0, "15", "6B747C"),
+        ("Heading3", 2, "21", "03090F"),
+        ("ListNumber", 0, "21", "03090F"),
+        ("ListNumber2", 0, "21", "03090F"),
+        ("ListBullet", 0, "21", "03090F"),
+        ("Byline", 0, "18", "6B747C"),
+        ("Subject", 2, "22", "010305"),
+        ("Dateline", 0, "19", "475159"),
+        ("Sender", 0, "16", "475159"),
+        ("Memolabel", 2, "18", "0072A1"),
+        ("Covertitle", 1, "80", "010305"),
+        ("Coversubtitle", 1, "32", "0072A1"),
+        ("TOCHeading", 2, "26", "010305"),
+        ("TOC1", 2, "21", "010305"),
+        ("TOC2", 0, "20", "475159"),
+    ],
+)
+def test_the_other_styles_set_face_size_and_colour(built, sid, face, size, color):
+    for f in ("geist", "aptos"):
+        s = style(built["handbook", f], sid)
+        assert set(fonts(s).values()) == {FACE[f][face]}, (sid, f)
+        assert (val(s, "sz"), val(s, "color")) == (size, color), (sid, f)

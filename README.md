@@ -59,11 +59,16 @@ In beamer, `\slideref{key}` puts a reference from the bibliography in the bottom
 
 ## Word
 
-`python -m fwl_visual_language.word templates` writes Word templates for 4 kinds of document, each in 2 faces: `Forming Worlds Letter`, `Report`, `Memo` and `Handbook`, in Geist for documents that leave as PDF and in Aptos, the Office default, for documents that others edit without the lab fonts. The built `.dotx` files are in `templates/`, and a test checks that each one matches a fresh build.
+```bash
+pip install "fwl-visual-language[word]"
+python -m fwl_visual_language.word templates
+```
 
-Every format sits in a named style: Normal, Title, Subtitle, Heading 1 to 3 (Heading 1 and 2 numbered, with the numbers in signal blue), Caption, List Bullet, List Number and List Number 2, Note, Key word (magma), Hyperlink and the contents styles, so typed text keeps the lab look. The letter has the logo and the sender block on its first page; the handbook has a cover, a contents field (right-click it and choose Update Field) and chapters that start on a new page.
+The command writes Word templates for 4 kinds of document, each in 2 faces: `Forming Worlds Letter`, `Report`, `Memo` and `Handbook`, in Geist for documents that leave as PDF and in Aptos, the Office default, for documents that others edit without the lab fonts. The built `.dotx` files are in `templates/`, and a test checks that each one matches a fresh build.
 
-Export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service that has no Geist and puts Calibri and Cambria in its place. Geist must be installed on the computer; current versions of Microsoft Office include Aptos.
+Text, headings, lists, notes and captions use named styles, among them Normal, Title, Subtitle, Heading 1 to 3 (Heading 1 and 2 numbered, with the numbers in signal blue), Caption, List Bullet, List Number and List Number 2, Note, Key word (magma), Hyperlink and the contents styles, so typed text keeps the lab look. The letter has the logo and the sender block on its first page; the handbook has a cover, a contents field (right-click it and choose Update Field) and chapters that start on a new page.
+
+In Word for Mac, export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service; with Word 16.113 it replaced Geist with Calibri and Cambria. Geist must be installed on the computer; Word 16.113 ships with Aptos.
 
 ## Develop
 

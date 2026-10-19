@@ -4,10 +4,11 @@ The handbook, for long internal documents, has a cover, a contents field and
 chapters that start on a new page; the report keeps its chapters in the text
 flow. Each kind comes in two faces: Geist, for documents that leave as PDF, and
 Aptos, the Office default, for documents that others edit without the lab
-fonts. Every format lives in a named style (Normal, Title, Subtitle, numbered
-Heading 1 and 2, Caption, List Bullet, Hyperlink, Key word, Header, Footer),
-so text typed into a template keeps the lab look. Pages are A4 with the ink
-logo for paper, ink text and signal-blue accents, as in ``fwlproposal.sty``.
+fonts. Text, headings, lists, notes and captions use named styles (among them
+Normal, Title, Subtitle, Heading 1 to 3, Caption, List Bullet, List Number,
+Note, Key word, Hyperlink, Header and Footer), so text typed into a template
+keeps the lab look. Pages are A4 with the ink logo for paper, ink text and
+signal-blue accents.
 
 Build them with the ``word`` extra (``python-docx``)::
 
@@ -149,7 +150,9 @@ class _Builder:
             )
             + "</w:tblBorders>"
         )
-        table._tbl.tblPr.append(b)
+        table._tbl.tblPr.insert_element_before(
+            b, "w:shd", "w:tblLayout", "w:tblCellMar", "w:tblLook", "w:tblCaption"
+        )
 
     # --- styles ----------------------------------------------------------------------------
 
@@ -472,6 +475,7 @@ class _Builder:
         )
         props.created = props.modified = datetime(2026, 10, 19)
         props.revision = 1
+        props.comments = ""  # python-docx's default template names itself here
         if template:
             self.doc.part._content_type = TEMPLATE_CT
         self.doc.save(str(out))
