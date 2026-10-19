@@ -323,8 +323,9 @@ def test_property_children_keep_the_schema_order(built):
             for tag, order in ORDER.items():
                 for el in root.iter(f"{W}{tag}"):
                     kids = [c.tag.split("}")[1] for c in el if c.tag.startswith(W)]
+                    assert set(kids) <= set(order) | {"ins", "del"}, (path.name, tag, kids)
                     pos = [order.index(k) for k in kids if k in order]
-                    assert pos == sorted(pos), (path.name, name, tag, kids)
+                    assert pos == sorted(set(pos)), (path.name, name, tag, kids)
 
 
 def test_every_template_embeds_the_ink_logo(built):
@@ -353,6 +354,8 @@ def test_numbers_point_at_their_lists_and_borders_are_stripped(built):
     for sid in ("Title", "Subtitle", "Heading3"):
         s = style(path, sid)
         assert s.find(".//w:pBdr", NS) is None and s.find(".//w:numPr", NS) is None, sid
+    for sid in ("Heading1", "Heading2"):
+        assert style(path, sid).find(".//w:pBdr", NS) is None, sid
     for sid in ("Heading1", "Heading2", "Heading3"):
         assert style(path, sid).find(".//w:keepNext", NS) is not None, sid
 
@@ -394,3 +397,89 @@ def test_the_other_styles_set_face_size_and_colour(built, sid, face, size, color
         s = style(built["handbook", f], sid)
         assert set(fonts(s).values()) == {FACE[f][face]}, (sid, f)
         assert (val(s, "sz"), val(s, "color")) == (size, color), (sid, f)
+
+
+def spacing(s):
+    sp = s.find(".//w:pPr/w:spacing", NS)
+    get = (lambda k: sp.get(f"{W}{k}")) if sp is not None else (lambda k: None)
+    ind = s.find(".//w:pPr/w:ind", NS)
+    return get("before"), get("after"), get("line"), None if ind is None else ind.get(f"{W}left")
+
+
+def test_styles_set_their_spacing_and_indents(built):
+    path = built["handbook", "geist"]
+    expect = {  # twentieths of a point; line in 240ths; indent in twips
+        "Normal": (None, "120", "288", None),
+        "Title": ("360", "40", "240", None),
+        "Heading1": ("0", "360", None, None),
+        "Heading2": ("240", "80", None, None),
+        "Caption": ("80", "240", "240", None),
+        "Note": ("120", "160", None, "227"),
+        "TOC2": ("0", "40", None, "340"),
+        "Covertitle": ("3000", "80", None, None),
+    }
+    assert {sid: spacing(style(path, sid)) for sid in expect} == expect
+    assert spacing(style(built["report", "geist"], "Heading1"))[:2] == ("320", "120")
+
+
+@pytest.mark.parametrize(
+    "kind, left, first_page",
+    [
+        ("letter", word.LAB_LINE, True),
+        ("report", "Title of the report  ·  Forming Worlds Lab", False),
+        ("memo", "Forming Worlds Lab  ·  internal memo", False),
+        ("handbook", "Forming Worlds Lab  ·  Handbook", True),
+    ],
+)
+def test_each_kind_has_its_footer_and_first_page_setting(built, kind, left, first_page):
+    path = built[kind, "aptos"]
+    doc = part(path, "word/document.xml")
+    assert (doc.find(".//w:sectPr/w:titlePg", NS) is not None) == first_page
+    rid = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+    with zipfile.ZipFile(path) as z:
+        rels = {
+            r.get("Id"): r.get("Target")
+            for r in etree.fromstring(z.read("word/_rels/document.xml.rels"))
+        }
+        refs = {
+            f.get(f"{W}type"): f.get(rid) for f in doc.findall(".//w:sectPr/w:footerReference", NS)
+        }
+        default = etree.fromstring(z.read(f"word/{rels[refs['default']]}"))
+        first = etree.fromstring(z.read(f"word/{rels[refs['first']]}")) if "first" in refs else None
+    p = default.find("w:p", NS)
+    assert "".join(p.itertext()) == left + "1" and p.find(".//w:r/w:tab", NS) is not None
+    assert val(p, "pStyle") == "Footer"
+    if kind == "letter":
+        assert "".join(first.itertext()) == left + "1"
+    elif kind == "handbook":  # the cover has no footer
+        assert first is None or not "".join(first.itertext()).strip()
+
+
+def test_tables_have_no_borders_and_the_sender_block_its_style(built):
+    for kind in ("letter", "memo"):
+        with zipfile.ZipFile(built[kind, "geist"]) as z:
+            xml = [
+                etree.fromstring(z.read(n))
+                for n in z.namelist()
+                if re.fullmatch(r"word/(document|header\d+)\.xml", n)
+            ]
+        tables = [t for x in xml for t in x.iter(f"{W}tbl")]
+        assert len(tables) == (1 if kind == "letter" else 2)
+        for t in tables:
+            b = t.find("w:tblPr/w:tblBorders", NS)
+            assert b is not None and [c.get(f"{W}val") for c in b] == ["nil"] * 6, kind
+    doc = part(built["letter", "geist"], "word/document.xml")
+    with zipfile.ZipFile(built["letter", "geist"]) as z:
+        hdr = next(
+            etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/header\d+\.xml", n) and b"Name Surname" in z.read(n)
+        )
+    cell = hdr.findall(".//w:tc", NS)[1]
+    lines = cell.findall("w:p", NS)
+    assert ["".join(p.itertext()) for p in lines] == list(word.SENDER)
+    assert {val(p, "pStyle") for p in lines} == {"Sender"} and {val(p, "jc") for p in lines} == {
+        "right"
+    }
+    assert fonts(lines[0].find("w:r", NS))["ascii"] == "Geist Medium"
+    assert doc is not None
