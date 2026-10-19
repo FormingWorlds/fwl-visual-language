@@ -159,6 +159,13 @@ def test_samples_have_no_personal_content(built):
     )
     assert "SPEAKER NAME" in text and "Venue, city" in text
     assert not re.search(r"\bTim\b|TIM LICHTENBERG|Leuven", text)
+    refs = [
+        sh.text_frame.text
+        for s in prs.slides
+        for sh in s.placeholders
+        if sh.placeholder_format.idx in (20, 21) and sh.text_frame.text
+    ]
+    assert len(refs) == 4 and all(r.startswith("Author") for r in refs), refs
 
 
 def test_more_layouts_than_the_base_template_has_are_refused(tmp_path, monkeypatch):

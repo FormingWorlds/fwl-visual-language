@@ -561,7 +561,7 @@ def _samples(prs, g, figure):
         {
             0: [[("Lava world atmospheres are fed from the ", ""), ("interior", hl)]],
             1: [[("Outgassing follows the redox state of the magma", "")]],
-            20: [[("Nicholls+ 25 ", ""), ("MNRAS", "i")]],
+            20: [[("Author+ 25 ", ""), ("MNRAS", "i")]],
         },
         figs=[10],
     )
@@ -569,7 +569,7 @@ def _samples(prs, g, figure):
         "Figure, large",
         {
             0: [[("Residual atmospheres are mass-sorted", "")]],
-            21: [[("Lichtenberg+ 25 ", ""), ("Science", "i")]],
+            21: [[("Author+ 24 ", ""), ("Science", "i")]],
         },
         figs=[10],
     )
@@ -577,8 +577,8 @@ def _samples(prs, g, figure):
         "Two figures",
         {
             0: [[("Sulfur species trace the interior phase state", "")]],
-            20: [[("Teske+ 25 ", ""), ("ApJL", "i")]],
-            21: [[("Lichtenberg & Miguel 25 ", ""), ("Treatise on Geochemistry", "i")]],
+            20: [[("Author & Author 25 ", ""), ("ApJL", "i")]],
+            21: [[("Author+ 26a ", ""), ("A&A", "i")]],
         },
         figs=[10, 11],
     )
