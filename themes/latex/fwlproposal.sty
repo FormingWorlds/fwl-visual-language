@@ -1,15 +1,15 @@
 % Forming Worlds Lab proposal and report style (fwl-visual-language 0.2.0). Generated; edit the generator, not this file.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{fwlproposal}[2026/10/18 v0.2.0 Forming Worlds Lab]
-\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/18}{}%
+\ProvidesPackage{fwlproposal}[2026/10/20 v0.2.0 Forming Worlds Lab]
+\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
   {\PackageError{fwlproposal}{fwl.sty is older than this style}{Reinstall.}}%
-  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/18]}
+  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/20]}
 \RequirePackage[a4paper,margin=2cm]{geometry}
 \RequirePackage{titlesec}
 \RequirePackage{caption}
 \RequirePackage{enumitem}
 \RequirePackage{fancyhdr}
-\RequirePackage[colorlinks=true,linkcolor=fwlLink,urlcolor=fwlLink,citecolor=fwlLink]{hyperref}
+\@ifpackageloaded{hyperref}{\hypersetup{colorlinks=true,linkcolor=fwlLink,urlcolor=fwlLink,citecolor=fwlLink}}{\RequirePackage[colorlinks=true,linkcolor=fwlLink,urlcolor=fwlLink,citecolor=fwlLink]{hyperref}}
 
 \linespread{1.08}\selectfont
 \setlength{\parindent}{0pt}

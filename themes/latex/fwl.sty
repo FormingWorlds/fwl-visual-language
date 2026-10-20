@@ -1,6 +1,6 @@
 % Forming Worlds Lab LaTeX package (fwl-visual-language 0.2.0). Generated from the lab tokens; edit tokens/fwl.json, not this file.
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{fwl}[2026/10/18 v0.2.0 Forming Worlds Lab]
+\ProvidesPackage{fwl}[2026/10/20 v0.2.0 Forming Worlds Lab]
 \newif\iffwl@math
 \DeclareOption{math}{\fwl@mathtrue}
 \ProcessOptions\relax
@@ -84,8 +84,11 @@
   FontFace={md}{n}{GeistMono-Medium.ttf}]
 \newcommand{\fwlmedium}{\fontseries{md}\selectfont}
 
-% Math: letters, digits and Greek from Inter (Medium for bold), everything
+% Math: letters, digits and Greek from Inter (SemiBold for bold), everything
 % else from STIX Two. The math option or \fwlusemath in the preamble loads it once.
+% \bm and \boldsymbol make a symbol bold in its own slant: italic letters and small
+% Greek, upright digits and capital Greek. Math in headings reaches the bookmarks
+% through the psdextra option of hyperref.
 \newif\iffwl@mathdone
 \newcommand{\fwlusemath}{\iffwl@mathdone\else\global\fwl@mathdonetrue
   \RequirePackage{unicode-math}
@@ -94,12 +97,17 @@
     range={up/{latin,Latin,num,greek,Greek}}]
   \setmathfont{Inter-Italic.ttf}[Path=\fwlfontpath,
     range={it/{latin,Latin,greek,Greek}}]
-  \setmathfont{Inter-Medium.ttf}[Path=\fwlfontpath,
-    range={bfup/{latin,Latin,num,greek,Greek}}]
-  \setmathfont{Inter-MediumItalic.ttf}[Path=\fwlfontpath,
-    range={bfit/{latin,Latin,greek,Greek}}]
+  \setmathfont{Inter-SemiBold.ttf}[Path=\fwlfontpath,
+    range={bfup/{latin,Latin,num,greek,Greek},bfit/{Greek}}]
+  \setmathfont{Inter-SemiBoldItalic.ttf}[Path=\fwlfontpath,
+    range={bfit/{latin,Latin,greek}}]
 \fi}
 \@onlypreamble\fwlusemath
+\newcommand{\fwl@bm}[1]{\symbf{\symbfit{#1}}}
+\AtBeginDocument{\iffwl@mathdone\let\bm\fwl@bm\let\boldsymbol\fwl@bm
+  \ifdefined\hypersetup\hypersetup{psdextra}%
+    \pdfstringdefDisableCommands{\let\bm\@firstofone
+      \let\boldsymbol\@firstofone}\fi\fi}
 \iffwl@math\fwlusemath\fi
 \color{fwlText}
 \endinput

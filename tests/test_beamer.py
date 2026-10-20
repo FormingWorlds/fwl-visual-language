@@ -63,7 +63,7 @@ def test_theme_is_an_output_and_stable():
     assert cli.OUTPUTS["beamer/beamerthemefwl.sty"] is beamer.beamer_theme
     text = beamer.beamer_theme()
     assert text == beamer.beamer_theme()
-    assert "\\ProvidesPackage{beamerthemefwl}[2026/10/18" in text
+    assert "\\ProvidesPackage{beamerthemefwl}[2026/10/20" in text
     from datetime import date
 
     assert "2027/01/02" in beamer.beamer_theme(date(2027, 1, 2))

@@ -75,7 +75,9 @@ jobs:
           pytest -rs tests/test_build_latex.py::test_document_compiles_and_embeds_only_geist \
             tests/test_build_latex.py::test_proposal_compiles_with_inter_and_stix_math \
             tests/test_build_latex.py::test_math_loads_once_and_only_in_the_preamble \
+            tests/test_build_latex.py::test_bm_and_boldsymbol_give_bold_math_with_or_without_the_bm_package \
+            tests/test_build_latex.py::test_greek_and_bold_math_in_headings_reach_the_bookmarks \
             tests/test_beamer.py::test_talk_compiles_with_references_in_both_corners \
             tests/test_beamer.py::test_talk_embeds_the_lab_fonts | tee out.txt
-          grep -qE "(^|[^0-9])5 passed" out.txt
+          grep -qE "(^|[^0-9])7 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi

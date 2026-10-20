@@ -28,9 +28,9 @@ ASSET_DIR = "fwl-assets"
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
 _LOGO = "fwl-logo-white.png"
 
-_BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/18}{}%
+_BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
   {\PackageError{beamerthemefwl}{fwl.sty is older than this theme}{Install both again.}}%
-  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/18]}
+  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/20]}
 \RequirePackage{tikz}
 \RequirePackage{xstring}
 \RequirePackage{etoolbox}
@@ -254,7 +254,7 @@ def beamer_theme(release=None):
     Parameters
     ----------
     release : datetime.date, optional
-        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-18 so the
+        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-20 so the
         generated file does not change from day to day.
 
     Returns
@@ -262,7 +262,7 @@ def beamer_theme(release=None):
     str
         LaTeX package source.
     """
-    release = release or date(2026, 10, 18)
+    release = release or date(2026, 10, 20)
     head = [
         f"% Forming Worlds Lab beamer theme (fwl-visual-language {__version__}). Generated; edit",
         "% the generator, not this file. Compile with lualatex; references with bibtex.",
