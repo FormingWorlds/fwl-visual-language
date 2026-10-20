@@ -336,8 +336,9 @@ def palette(mode="paper"):
     -------
     list of tuple
         ``(name, hex)`` pairs in cycle order. Colour 1 is signal and colour 2
-        magma, both as ramp steps (the Word and slide themes put magma first); the token file may give any entry as a ramp
-        step or a hex value.
+        magma, both as ramp steps (the Word and slide themes put magma
+        first); the token file may give any entry as a ramp step or a hex
+        value.
 
     Raises
     ------

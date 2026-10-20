@@ -286,6 +286,9 @@ class _Builder:
         rpr.find(self.qn("w:rPr")).insert_element_before(colour, *rpr_successors("w:color"))
         normal = self.style("Normal", 10.5, None, after=6)
         normal.paragraph_format.line_spacing = 1.2
+        for name in ("Normal", "Heading 3", "List Bullet", "List Number", "List Number 2"):
+            for el in self.doc.styles[name].element.get_or_add_rPr().findall(self.qn("w:color")):
+                el.getparent().remove(el)
         title = self.style("Title", 24, ink("950"), f["light"], before=18, after=2)
         subtitle = self.style("Subtitle", 12, ink("600"), after=4)
         if self.chapters == "A":
@@ -294,7 +297,7 @@ class _Builder:
             h1 = self.style("Heading 1", 20, ink("950"), f["light"], before=0, after=18)
             h1.paragraph_format.page_break_before = True
         h2 = self.style("Heading 2", 11, ink("950"), f["medium"], before=12, after=4)
-        h3 = self.style("Heading 3", 10.5, ink("900"), f["medium"], before=10, after=3)
+        h3 = self.style("Heading 3", 10.5, None, f["medium"], before=10, after=3)
         for st in (title, subtitle, h1, h2, h3):
             ppr = st.element.get_or_add_pPr()
             for tag in ("w:pBdr", "w:numPr"):
@@ -304,7 +307,7 @@ class _Builder:
         for st in (h1, h2, h3):
             st.paragraph_format.keep_with_next = True
         self.style("Caption", 8.5, ink("600"), before=4, after=12)
-        self.style("List Bullet", 10.5, ink("900"), after=3)
+        self.style("List Bullet", 10.5, None, after=3)
         for name, size, color in (("Header", 7.5, ink("500")), ("Footer", 7.5, ink("500"))):
             self.style(name, size, color, after=0)
         self.style("Byline", 9, ink("500"), after=14)
@@ -312,8 +315,8 @@ class _Builder:
         self.style("Date line", 9.5, ink("600"), before=18)
         self.style("Sender", 8, ink("600"), after=0)
         self.style("Memo label", 9, _hex("signal", "500"), f["medium"], after=0)
-        self.style("List Number", 10.5, ink("900"), after=3)
-        self.style("List Number 2", 10.5, ink("900"), after=3)
+        self.style("List Number", 10.5, None, after=3)
+        self.style("List Number 2", 10.5, None, after=3)
         note = self.style("Note", 10, ink("700"), before=6, after=8)
         self.border(note.element.get_or_add_pPr(), "left", _hex("signal", "500"), 18, space=8)
         note.paragraph_format.left_indent = self.Cm(0.4)
