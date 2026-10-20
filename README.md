@@ -70,6 +70,35 @@ Text, headings, lists, notes and captions use named styles, among them Normal, T
 
 In Word for Mac, export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service; in a test with Word 16.113 it replaced Geist with other fonts. Geist must be installed on the computer; Word 16.113 ships with Aptos.
 
+## Social media
+
+```bash
+pip install "fwl-visual-language[social]"
+python -m fwl_visual_language.social cards.json cards/
+```
+
+The command renders square 1080 px PNG cards for Bluesky, Mastodon, Instagram and LinkedIn, on the ink ground with Geist, signal-blue labels and the lab logo. `cards.json` lists the cards; each entry names its `card`, its output `file` and the arguments of that card, and image paths resolve next to the JSON file:
+
+```json
+{"cards": [
+  {"card": "paper", "file": "paper", "photo": "first-author.jpg", "title": "Title of the paper",
+   "authors": ["First Author", "Second Author", "Third Author", "Fourth Author"], "lab": ["Fourth Author"]},
+  {"card": "glance", "file": "glance", "text": "The At a glance text of the paper.", "ref": "arXiv:0000.00000"}
+]}
+```
+
+| Card | Holds |
+|---|---|
+| `paper` | the first author's photo, the paper title, and the first 3 authors, the number of the others and every lab member among them ("and 10 co-authors, incl. ...") |
+| `glance` | the At a glance text of the paper, up to 15 lines |
+| `figure` | a headline, the figure on a white panel and its source |
+| `cover` | the question the paper answers, as the first slide of a carousel |
+| `member` | a member's photo with name and 2 short lines |
+| `event` | a conference with up to 7 lab contributions |
+| `highlight` | an Instagram Story Highlight cover from a square detail of an artwork |
+
+A text that does not fit its card stops the command with an error instead of running off the card. Photos and artwork are not in this repository; the cards take them from the caller.
+
 ## Develop
 
 ```bash
