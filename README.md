@@ -70,6 +70,30 @@ Text, headings, lists, notes and captions use named styles, among them Normal, T
 
 In Word for Mac, export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service; in a test with Word 16.113 it replaced Geist with other fonts. Geist must be installed on the computer; Word 16.113 ships with Aptos.
 
+## Posters
+
+```bash
+python -m fwl_visual_language.poster path/to/poster          # LaTeX style, fonts and logos
+python -m fwl_visual_language.poster --pptx templates         # PowerPoint posters
+```
+
+A poster carries a header with the title, the authors, the affiliation and the lab logo, then 3 numbered messages, each a statement with 2 figures and their references, and a contact line at the foot. The LaTeX style takes the format and the look as options, `\usepackage[a0portrait,dark]{fwlposter}`: `a0portrait`, `a0landscape`, `a4` (a one-pager) or `slide` (16:9, for e-poster screens), and `dark` (the ink ground, figures on white panels) or `light` (white). Portrait formats stack the messages, landscape formats set them side by side. Compile with LuaLaTeX:
+
+```latex
+\documentclass{article}
+\usepackage[a0portrait,dark]{fwlposter}
+\postertitle{Title of the poster as one statement}
+\posterauthors{Name Surname and the Forming Worlds Lab}
+\posteraffiliation{Kapteyn Astronomical Institute, University of Groningen}
+\postercontact{formingworlds.space}
+\postermessage{First message as one statement}{figure-1a}{Author+ YY Journal}{figure-1b}{Author+ YY Journal}
+\postermessage{Second message}{figure-2a}{Reference}{figure-2b}{Reference}
+\postermessage{Third message}{figure-3a}{Reference}{figure-3b}{Reference}
+\begin{document}\makeposter\end{document}
+```
+
+`templates/` holds the PowerPoint posters, one file per format with a dark and a light slide; edit the slide of your look, delete the other, and replace each placeholder figure with your own.
+
 ## Social media
 
 ```bash

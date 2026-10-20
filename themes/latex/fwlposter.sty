@@ -1,0 +1,140 @@
+% Forming Worlds Lab poster style (fwl-visual-language 0.2.0). Generated; edit the generator, not this file.
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{fwlposter}[2026/10/20 v0.2.0 Forming Worlds Lab]
+\newif\iffwl@dark\fwl@darktrue
+\DeclareOption{dark}{\fwl@darktrue}
+\DeclareOption{light}{\fwl@darkfalse}
+\DeclareOption{a0portrait}{\def\fwl@W{841}\def\fwl@H{1189}\def\fwl@B{1000}\def\fwl@layout{rows}\def\fwl@head{300}\def\fwl@titlesize{50}\def\fwl@stmt{31}\def\fwl@ref{15}}
+\DeclareOption{a0landscape}{\def\fwl@W{1189}\def\fwl@H{841}\def\fwl@B{1414}\def\fwl@layout{columns}\def\fwl@head{200}\def\fwl@titlesize{46}\def\fwl@stmt{28}\def\fwl@ref{14}}
+\DeclareOption{a4}{\def\fwl@W{210}\def\fwl@H{297}\def\fwl@B{1000}\def\fwl@layout{rows}\def\fwl@head{190}\def\fwl@titlesize{40}\def\fwl@stmt{27}\def\fwl@ref{14}}
+\DeclareOption{slide}{\def\fwl@W{338.67}\def\fwl@H{190.5}\def\fwl@B{1600}\def\fwl@layout{columns}\def\fwl@head{170}\def\fwl@titlesize{40}\def\fwl@stmt{25}\def\fwl@ref{13}}
+\ExecuteOptions{a0portrait,dark}
+\ProcessOptions\relax
+\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
+  {\PackageError{fwlposter}{fwl.sty is older than this style}{Install both again.}}%
+  \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/20]}
+\RequirePackage{tikz}
+\RequirePackage{graphicx}
+\providecommand{\fwlassetpath}{fwl-assets/}
+\RequirePackage[paperwidth=\fwl@W mm,paperheight=\fwl@H mm,margin=0pt]{geometry}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\newfontfamily\fwllightface{Geist}[Path=\fwlfontpath,UprightFont=Geist-Light.ttf,
+  ItalicFont=Geist-LightItalic.ttf]
+
+% Design units: the page is \fwl@B units wide; \fwl@u gives a length, \fwl@fs a font size.
+\newcommand{\fwl@u}[1]{\fpeval{(#1)*\fwl@W/\fwl@B}mm}
+\newcommand{\fwl@fs}[2][1.15]{\fontsize{\fpeval{(#2)*\fwl@W/\fwl@B*2.84528}pt}%
+  {\fpeval{(#2)*\fwl@W/\fwl@B*2.84528*#1}pt}\selectfont}
+\iffwl@dark
+  \colorlet{fwlPosterGround}{fwlInk950}\colorlet{fwlPosterHead}{fwlInk900}
+  \colorlet{fwlPosterRule}{fwlSignal400}\colorlet{fwlPosterText}{white}
+  \colorlet{fwlPosterMuted}{fwlInk300}\colorlet{fwlPosterLine}{fwlInk700}
+  \def\fwl@logo{fwl-logo-white.png}\def\fwl@pad{8}\def\fwl@panel{white}
+\else
+  \colorlet{fwlPosterGround}{white}\colorlet{fwlPosterHead}{fwlInk50}
+  \colorlet{fwlPosterRule}{fwlSignal500}\colorlet{fwlPosterText}{fwlInk950}
+  \colorlet{fwlPosterMuted}{fwlInk600}\colorlet{fwlPosterLine}{fwlInk200}
+  \def\fwl@logo{fwl-logo-ink.png}\def\fwl@pad{0}\def\fwl@panel{fwlPosterGround}
+\fi
+\colorlet{fwlPosterNumber}{fwlPosterRule}
+\pagecolor{fwlPosterGround}
+
+\newcommand{\postertitle}[1]{\def\fwl@title{#1}}
+\newcommand{\posterauthors}[1]{\def\fwl@authors{#1}}
+\newcommand{\posteraffiliation}[1]{\def\fwl@affiliation{#1}}
+\newcommand{\postercontact}[1]{\def\fwl@contact{#1}}
+\postertitle{}\posterauthors{}\posteraffiliation{}\postercontact{}
+\newcount\fwl@messages
+% \postermessage{statement}{figure}{reference}{figure}{reference}
+\newcommand{\postermessage}[5]{\global\advance\fwl@messages by 1
+  \ifnum\fwl@messages>3 \PackageError{fwlposter}{A poster holds 3 messages}{Remove one.}\fi
+  \expandafter\def\csname fwl@m\the\fwl@messages\endcsname{#1}%
+  \expandafter\def\csname fwl@fa\the\fwl@messages\endcsname{#2}%
+  \expandafter\def\csname fwl@ra\the\fwl@messages\endcsname{#3}%
+  \expandafter\def\csname fwl@fb\the\fwl@messages\endcsname{#4}%
+  \expandafter\def\csname fwl@rb\the\fwl@messages\endcsname{#5}}
+
+% Text set in a \parbox: a TikZ node with "text width" drops the spaces of text above 30 pt.
+\newcommand{\fwl@text}[2]{\parbox[t]{\fwl@u{#1}}{\raggedright #2}}
+
+% A figure fitted into a box (x, y top-left, width, height in design units),
+% on a white panel on the dark ground, with its reference under it.
+\newcommand{\fwl@figure}[6]{%
+  \node[anchor=center,inner sep=\fwl@u{\fwl@pad},fill=\fwl@panel,rounded corners=\fwl@u{8}]
+    at (\fwl@u{#1+#3/2},-\fwl@u{#2+#4/2})
+    {\includegraphics[width=\fwl@u{#3-16},height=\fwl@u{#4-16},keepaspectratio]{#5}};
+  \node[anchor=north west,inner sep=0pt,text=fwlPosterMuted] at (\fwl@u{#1},-\fwl@u{#2+#4+6})
+    {\fwl@text{#3}{\fwl@fs{\fwl@ref}#6}};}
+
+% Statements are set before the picture, where TikZ has no font; their heights go
+% into \fwl@sh1 to \fwl@sh3 in design units.
+\expandafter\newsavebox\csname fwl@sb1\endcsname
+\expandafter\newsavebox\csname fwl@sb2\endcsname
+\expandafter\newsavebox\csname fwl@sb3\endcsname
+\newcommand{\fwl@measure}[1]{%
+  \expandafter\sbox\csname fwl@sb#1\endcsname{\fwl@text{\fwl@sw}{\fwlmedium
+    \fwl@fs[1.12]{\fwl@stmt}\color{fwlPosterText}\csname fwl@m#1\endcsname}}%
+  \expandafter\xdef\csname fwl@sh#1\endcsname{\fpeval{max((\the\ht\csname fwl@sb#1\endcsname
+    +\the\dp\csname fwl@sb#1\endcsname)/2.84528*\fwl@B/\fwl@W,\fwl@stmt*1.8)}}}
+
+\newcommand{\makeposter}{%
+  \ifnum\fwl@messages=3\else\PackageError{fwlposter}{A poster needs 3 \string\postermessage}{}\fi
+  \edef\fwl@colw{\fpeval{(\fwl@B-80-2*34)/3}}%
+  \edef\fwl@sw{\fpeval{\ifx\fwl@layout\fwl@rowsname \fwl@B-80\else\fwl@colw\fi-\fwl@stmt*1.6}}%
+  \fwl@measure{1}\fwl@measure{2}\fwl@measure{3}%
+  \begin{tikzpicture}[remember picture,overlay,shift={(current page.north west)}]
+  \fill[fwlPosterHead] (0,0) rectangle (\paperwidth,-\fwl@u{\fwl@head});
+  \fill[fwlPosterRule] (0,-\fwl@u{\fwl@head-6}) rectangle (\paperwidth,-\fwl@u{\fwl@head});
+  \node[anchor=north east,inner sep=0pt] at (\fwl@u{\fwl@B-40},-\fwl@u{\fwl@head*0.2})
+    {\includegraphics[height=\fwl@u{\fwl@head*0.36}]{\fwlassetpath\fwl@logo}};
+  \node[anchor=north west,inner sep=0pt,text=fwlPosterText] at (\fwl@u{40},-\fwl@u{\fwl@head*0.15})
+    {\fwl@text{\fwl@B*0.74-40}{%
+    {\fwllightface\fwl@fs[1.08]{\fwl@titlesize}\fwl@title\par}\vspace{\fwl@u{12}}%
+    {\fwlmedium\fwl@fs{\fwl@titlesize*0.44}\fwl@authors\par}\vspace{\fwl@u{4}}%
+    {\color{fwlPosterMuted}\fwl@fs{\fwl@titlesize*0.36}\fwl@affiliation\par}}};
+  \csname fwl@layout@\fwl@layout\endcsname
+  \node[anchor=south west,inner sep=0pt,text=fwlPosterMuted]
+    at (\fwl@u{40},-\fwl@u{\fwl@H/\fwl@W*\fwl@B-24}) {\fwl@fs{\fwl@ref*1.15}\fwl@contact};
+  \end{tikzpicture}\null}
+\def\fwl@rowsname{rows}
+
+% The number and the statement of message #1 at x = #2, y = \fwl@y.
+\newcommand{\fwl@statement}[2]{%
+  \edef\fwl@sh{\csname fwl@sh#1\endcsname}%
+  \node[anchor=north west,inner sep=0pt,text=fwlPosterNumber] at (\fwl@u{#2},-\fwl@u{\fwl@y})
+    {\fwllightface\fwl@fs[1]{\fwl@stmt*1.9}#1};
+  \node[anchor=north west,inner sep=0pt]
+    at (\fwl@u{#2+\fwl@stmt*1.6},-\fwl@u{\fwl@y+\fwl@stmt*0.25})
+    {\usebox{\csname fwl@sb#1\endcsname}};}
+
+\newcommand{\fwl@layout@rows}{%
+  \edef\fwl@sec{\fpeval{(\fwl@H/\fwl@W*\fwl@B-\fwl@head-36-110)/3}}%
+  \edef\fwl@half{\fpeval{(\fwl@B-80-24)/2}}%
+  \foreach \i in {1,2,3}{%
+    \edef\fwl@y{\fpeval{\fwl@head+36+(\i-1)*\fwl@sec}}%
+    \fwl@statement{\i}{40}%
+    \edef\fwl@fy{\fpeval{\fwl@y+\fwl@sh+18}}%
+    \edef\fwl@fh{\fpeval{\fwl@y+\fwl@sec-\fwl@ref*3.6-\fwl@fy}}%
+    \fwl@figure{40}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fa\i\endcsname}%
+      {\csname fwl@ra\i\endcsname}%
+    \fwl@figure{40+\fwl@half+24}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fb\i\endcsname}%
+      {\csname fwl@rb\i\endcsname}%
+    \ifnum\i<3 \fill[fwlPosterLine] (\fwl@u{40},-\fwl@u{\fwl@y+\fwl@sec-12})
+      rectangle (\fwl@u{\fwl@B-40},-\fwl@u{\fwl@y+\fwl@sec-11});\fi}}
+
+\newcommand{\fwl@layout@columns}{%
+  \edef\fwl@y{\fpeval{\fwl@head+30}}%
+  \edef\fwl@bottom{\fpeval{\fwl@H/\fwl@W*\fwl@B-70}}%
+  \foreach \i in {1,2,3}{%
+    \edef\fwl@x{\fpeval{40+(\i-1)*(\fwl@colw+34)}}%
+    \fwl@statement{\i}{\fwl@x}%
+    \edef\fwl@fy{\fpeval{\fwl@y+max(\fwl@sh,\fwl@stmt*3.4)+16}}%
+    \edef\fwl@fh{\fpeval{(\fwl@bottom-\fwl@fy-2*\fwl@ref*2.4)/2}}%
+    \fwl@figure{\fwl@x}{\fwl@fy}{\fwl@colw}{\fwl@fh}{\csname fwl@fa\i\endcsname}%
+      {\csname fwl@ra\i\endcsname}%
+    \fwl@figure{\fwl@x}{\fwl@fy+\fwl@fh+\fwl@ref*2.4}{\fwl@colw}{\fwl@fh}%
+      {\csname fwl@fb\i\endcsname}{\csname fwl@rb\i\endcsname}%
+    \ifnum\i<3 \fill[fwlPosterLine] (\fwl@u{\fwl@x+\fwl@colw+16},-\fwl@u{\fwl@y})
+      rectangle (\fwl@u{\fwl@x+\fwl@colw+17},-\fwl@u{\fwl@bottom});\fi}}
+\endinput
