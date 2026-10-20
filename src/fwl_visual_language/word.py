@@ -280,7 +280,11 @@ class _Builder:
         f, ink = self.f, lambda s: _hex("ink", s)
         rpr = self.doc.styles.element.find(self.qn("w:docDefaults")).find(self.qn("w:rPrDefault"))
         self.fonts(rpr.find(self.qn("w:rPr")), f["regular"])
-        normal = self.style("Normal", 10.5, ink("900"), after=6)
+        # the text colour sits in the defaults, so a table style can set its own
+        colour = self.E("w:color")
+        colour.set(self.qn("w:val"), ink("900"))
+        rpr.find(self.qn("w:rPr")).insert_element_before(colour, *rpr_successors("w:color"))
+        normal = self.style("Normal", 10.5, None, after=6)
         normal.paragraph_format.line_spacing = 1.2
         title = self.style("Title", 24, ink("950"), f["light"], before=18, after=2)
         subtitle = self.style("Subtitle", 12, ink("600"), after=4)
@@ -557,7 +561,7 @@ def theme_colours():
         Theme slot to 6-digit hex without ``#``: ``dk1`` ink-900, ``lt1`` white,
         ``dk2`` ink-700, ``lt2`` ink-50, ``accent1`` to ``accent6`` the paper
         palette magma, signal, fern, ochre, iris and garnet, ``hlink`` signal-500
-        and ``folHlink`` signal-700.
+        and ``folHlink`` iris.
     """
     paper = {name: hexv.lstrip("#") for name, hexv in palette("paper")}
     return {
@@ -572,7 +576,7 @@ def theme_colours():
         "accent5": paper["iris"],
         "accent6": paper["garnet"],
         "hlink": _hex("signal", "500"),
-        "folHlink": _hex("signal", "700"),
+        "folHlink": paper["iris"],
     }
 
 

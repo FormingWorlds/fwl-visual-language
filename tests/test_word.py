@@ -84,7 +84,7 @@ def test_styles_set_the_face_size_and_colour(built, face):
     regular, light, medium = FACE[face]
     path = built["report", face]
     expect = {
-        "Normal": (regular, "21", "03090F"),
+        "Normal": (regular, "21", None),  # the colour is a document default
         "Title": (light, "48", "010305"),
         "Subtitle": (regular, "24", "475159"),
         "Heading1": (medium, "26", "010305"),
@@ -611,7 +611,7 @@ def test_the_theme_colours_are_the_paper_palette(built):
         "accent5": paper["iris"],
         "accent6": paper["garnet"],
         "hlink": ramp("signal")["500"].lstrip("#"),
-        "folHlink": ramp("signal")["700"].lstrip("#"),
+        "folHlink": paper["iris"],
     }
     # independent anchors, so a token edit still trips the test
     assert (expect["dk1"], expect["accent1"], expect["accent2"]) == ("03090F", "B74B21", "0072A1")
@@ -643,3 +643,14 @@ def test_the_link_style_has_the_colour_of_the_theme_link(built):
         keyword = part(path, "word/styles.xml").xpath("//w:style[w:name/@w:val='Key word']", namespaces=NS)
         assert len(keyword) == 1, (kind, face)
         assert keyword[0].find("w:rPr/w:color", NS).get(f"{W}val") == word.theme_colours()["accent1"]
+
+
+def test_the_text_colour_is_a_document_default_so_table_styles_can_set_their_own(built):
+    ink = ramp("ink")["900"].lstrip("#")
+    for (kind, face), path in built.items():
+        styles = part(path, "word/styles.xml")
+        default = styles.find("w:docDefaults/w:rPrDefault/w:rPr/w:color", NS)
+        assert default is not None and default.get(f"{W}val") == ink, (kind, face)
+        assert style(path, "Normal").find("w:rPr/w:color", NS) is None, (kind, face)
+        header = style(path, "MediumShading1-Accent3").find("w:tblStylePr[@w:type='firstRow']/w:rPr/w:color", NS)
+        assert header.get(f"{W}val") == "FFFFFF", (kind, face)
