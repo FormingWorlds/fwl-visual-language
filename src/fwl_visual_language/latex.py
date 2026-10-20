@@ -84,7 +84,7 @@ def sty(release=None):
     Parameters
     ----------
     release : datetime.date, optional
-        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-18 so the
+        Date written into ``\\ProvidesPackage``. Defaults to 2026-10-20 so the
         generated file does not change from day to day.
 
     Returns
@@ -92,7 +92,7 @@ def sty(release=None):
     str
         LaTeX package source.
     """
-    release = release or date(2026, 10, 18)
+    release = release or date(2026, 10, 20)
     fonts = tokens()["fonts"]
     lines = [
         "% Forming Worlds Lab LaTeX package (fwl-visual-language "
@@ -128,7 +128,9 @@ def sty(release=None):
         "",
         f"% Math: letters, digits and Greek from {fonts['math']} (SemiBold for bold), everything",
         "% else from STIX Two. The math option or \\fwlusemath in the preamble loads it once.",
-        "% \\bm and \\boldsymbol give bold italic letters and Greek and bold upright digits.",
+        "% \\bm and \\boldsymbol make a symbol bold in its own slant: italic letters and small",
+        "% Greek, upright digits and capital Greek. Math in headings reaches the bookmarks",
+        "% through the psdextra option of hyperref.",
         "\\newif\\iffwl@mathdone",
         "\\newcommand{\\fwlusemath}{\\iffwl@mathdone\\else\\global\\fwl@mathdonetrue",
         "  \\RequirePackage{unicode-math}",
@@ -138,14 +140,16 @@ def sty(release=None):
         "  \\setmathfont{Inter-Italic.ttf}[Path=\\fwlfontpath,",
         "    range={it/{latin,Latin,greek,Greek}}]",
         "  \\setmathfont{Inter-SemiBold.ttf}[Path=\\fwlfontpath,",
-        "    range={bfup/{latin,Latin,num,greek,Greek}}]",
+        "    range={bfup/{latin,Latin,num,greek,Greek},bfit/{Greek}}]",
         "  \\setmathfont{Inter-SemiBoldItalic.ttf}[Path=\\fwlfontpath,",
-        "    range={bfit/{latin,Latin,greek,Greek}}]",
+        "    range={bfit/{latin,Latin,greek}}]",
         "\\fi}",
         "\\@onlypreamble\\fwlusemath",
         "\\newcommand{\\fwl@bm}[1]{\\symbf{\\symbfit{#1}}}",
-        "\\AtBeginDocument{\\iffwl@mathdone\\providecommand{\\bm}{}%",
-        "  \\let\\bm\\fwl@bm\\let\\boldsymbol\\fwl@bm\\fi}",
+        "\\AtBeginDocument{\\iffwl@mathdone\\let\\bm\\fwl@bm\\let\\boldsymbol\\fwl@bm",
+        "  \\ifdefined\\hypersetup\\hypersetup{psdextra}%",
+        "    \\pdfstringdefDisableCommands{\\let\\bm\\@firstofone",
+        "      \\let\\boldsymbol\\@firstofone}\\fi\\fi}",
         "\\iffwl@math\\fwlusemath\\fi",
         "\\color{fwlText}",
         "\\endinput",
@@ -172,7 +176,7 @@ def proposal_sty(release=None):
         with ``\\fwlfooter`` on the left and the page number on the right, also
         on pages in the ``plain`` style.
     """
-    release = release or date(2026, 10, 18)
+    release = release or date(2026, 10, 20)
     return "\n".join(
         [
             "% Forming Worlds Lab proposal and report style (fwl-visual-language "
@@ -180,16 +184,17 @@ def proposal_sty(release=None):
             "\\NeedsTeXFormat{LaTeX2e}",
             f"\\ProvidesPackage{{fwlproposal}}[{release:%Y/%m/%d} v{__version__} "
             "Forming Worlds Lab]",
-            "\\@ifpackageloaded{fwl}{\\@ifpackagelater{fwl}{2026/10/18}{}%",
+            "\\@ifpackageloaded{fwl}{\\@ifpackagelater{fwl}{2026/10/20}{}%",
             "  {\\PackageError{fwlproposal}{fwl.sty is older than this style}{Reinstall.}}%",
-            "  \\fwlusemath}{\\RequirePackage[math]{fwl}[2026/10/18]}",
+            "  \\fwlusemath}{\\RequirePackage[math]{fwl}[2026/10/20]}",
             "\\RequirePackage[a4paper,margin=2cm]{geometry}",
             "\\RequirePackage{titlesec}",
             "\\RequirePackage{caption}",
             "\\RequirePackage{enumitem}",
             "\\RequirePackage{fancyhdr}",
-            "\\RequirePackage[colorlinks=true,linkcolor=fwlLink,urlcolor=fwlLink,"
-            "citecolor=fwlLink]{hyperref}",
+            "\\@ifpackageloaded{hyperref}{\\hypersetup{colorlinks=true,linkcolor=fwlLink,"
+            "urlcolor=fwlLink,citecolor=fwlLink}}{\\RequirePackage[colorlinks=true,"
+            "linkcolor=fwlLink,urlcolor=fwlLink,citecolor=fwlLink]{hyperref}}",
             "",
             "\\linespread{1.08}\\selectfont",
             "\\setlength{\\parindent}{0pt}",

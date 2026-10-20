@@ -12,7 +12,7 @@ import pytest
 
 import fwl_visual_language as fvl
 from fwl_visual_language import __main__ as cli
-from fwl_visual_language import latex
+from fwl_visual_language import beamer, latex
 
 THEMES = Path(__file__).resolve().parents[1] / "themes"
 
@@ -297,31 +297,66 @@ def test_math_loads_once_and_only_in_the_preamble(tmp_path):
 
 @pytest.mark.skipif(not (shutil.which("lualatex") and shutil.which("pdffonts")), reason="no TeX")
 def test_bm_and_boldsymbol_give_bold_math_with_or_without_the_bm_package(tmp_path):
-    """Each case typesets 1 bold symbol, so the embedded fonts show its face alone."""
+    """Each document typesets 1 bold symbol, so the embedded Inter fonts show its face alone."""
     latex.install_latex(tmp_path)
+    semi, semi_it = "Inter-SemiBold", "Inter-SemiBoldItalic"
+    symbols = {"y": {semi_it}, "1": {semi}}
+    every = dict(
+        symbols, Y={semi_it}, alpha={semi_it}, Omega={semi}, x1={semi_it, semi}, nabla=set()
+    )
+    source = {"alpha": "\\alpha", "Omega": "\\Omega", "x1": "x_1", "nabla": "\\nabla"}
     preambles = {
-        "none": "\\usepackage{fwlproposal}",
-        "ams": "\\usepackage{amsmath}\\usepackage{fwlproposal}",
-        "bmfirst": "\\usepackage{amsmath}\\usepackage{bm}\\usepackage{fwlproposal}",
-        "bmlast": "\\usepackage{fwlproposal}\\usepackage{bm}",
+        "proposal": ("\\usepackage{fwlproposal}", every),
+        "ams": ("\\usepackage{amsmath}\\usepackage{fwlproposal}", symbols),
+        "bmfirst": ("\\usepackage{amsmath}\\usepackage{bm}\\usepackage{fwlproposal}", every),
+        "bmlast": ("\\usepackage{fwlproposal}\\usepackage{bm}", symbols),
+        "option": ("\\usepackage[math]{fwl}\\usepackage{bm}", symbols),
+        "late": ("\\usepackage{bm}\\usepackage{fwl}\\fwlusemath", symbols),
     }
-    cases = {"letter": ("y", "Inter-SemiBoldItalic"), "digit": ("1", "Inter-SemiBold")}
-    for pre_name, pre in preambles.items():
+    wrong = []
+    for pre_name, (pre, cases) in preambles.items():
         for cmd in ("bm", "boldsymbol"):
-            if cmd == "boldsymbol" and pre_name == "none":
+            if cmd == "boldsymbol" and pre_name == "proposal":
                 continue
-            for case, (symbol, face) in cases.items():
+            for case, faces in cases.items():
                 name = f"{pre_name}-{cmd}-{case}"
                 (tmp_path / f"{name}.tex").write_text(
                     f"\\documentclass{{article}}{pre}\\pagestyle{{empty}}"
-                    f"\\begin{{document}}$\\{cmd}{{{symbol}}}$\\end{{document}}\n"
+                    f"\\begin{{document}}$\\{cmd}{{{source.get(case, case)}}}$\\end{{document}}\n"
                 )
-                names = _lualatex(tmp_path, name)
-                inter = {n for n in names if n.startswith("Inter")}
-                assert inter == {face}, (name, names)
-    # without the math option the bm package keeps its own \\bm
+                inter = {n for n in _lualatex(tmp_path, name) if n.startswith("Inter")}
+                if inter != faces:
+                    wrong.append((name, inter))
+    assert not wrong
+    # without the math option the bm package keeps its own bold \\bm
     (tmp_path / "plain.tex").write_text(
         "\\documentclass{article}\\usepackage{fwl}\\usepackage{bm}"
         "\\begin{document}$\\bm{y}$\\end{document}\n"
     )
-    assert not {n for n in _lualatex(tmp_path, "plain") if n.startswith("Inter")}
+    names = _lualatex(tmp_path, "plain")
+    assert not {n for n in names if n.startswith("Inter")}
+    assert any(n.startswith("CMMIB") for n in names), names
+
+
+@pytest.mark.skipif(not (shutil.which("lualatex") and shutil.which("pdffonts")), reason="no TeX")
+def test_greek_and_bold_math_in_headings_reach_the_bookmarks(tmp_path):
+    latex.install_latex(tmp_path)
+    beamer.install_beamer(tmp_path)
+    heading = "Field $\\alpha$ and $\\bm{\\Omega}$"
+    section = f"\\begin{{document}}\\section{{{heading}}}"
+    docs = {
+        "proposal": "\\documentclass{article}\\usepackage{fwlproposal}" + section,
+        "hyperref-first": "\\documentclass{article}\\usepackage{hyperref}"
+        "\\usepackage{fwlproposal}" + section,
+        "talk": "\\documentclass{beamer}\\usetheme{fwl}"
+        + section
+        + f"\\begin{{frame}}{{{heading}}}x\\end{{frame}}",
+    }
+    for name, text in docs.items():
+        (tmp_path / f"{name}.tex").write_text(text + "\\end{document}\n")
+        for _ in range(2):  # the second run reads the bookmarks back
+            names = _lualatex(tmp_path, name)
+        assert "Inter-SemiBold" in names, name
+        # the bookmark holds the Greek as UTF-16: alpha is 03B1, Omega 03A9 (octal escapes)
+        out = (tmp_path / f"{name}.out").read_text(errors="replace")
+        assert "\\003\\261" in out and "\\003\\251" in out, (name, out)
