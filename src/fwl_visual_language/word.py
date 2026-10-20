@@ -546,13 +546,18 @@ class _Builder:
 
 
 def theme_colours():
-    """Return the theme colours of the Word templates: ink and white, then the paper palette.
+    """Return the theme colours of the Word templates.
+
+    Accent 1 is magma and accent 2 signal, the order of the slide theme, but at
+    the paper steps; the figure palette puts signal first.
 
     Returns
     -------
     dict
-        ``dk1``, ``lt1``, ``dk2``, ``lt2``, ``accent1`` to ``accent6``,
-        ``hlink`` and ``folHlink`` as 6-digit hex without ``#``.
+        Theme slot to 6-digit hex without ``#``: ``dk1`` ink-900, ``lt1`` white,
+        ``dk2`` ink-700, ``lt2`` ink-50, ``accent1`` to ``accent6`` the paper
+        palette magma, signal, fern, ochre, iris and garnet, ``hlink`` signal-500
+        and ``folHlink`` signal-700.
     """
     paper = {name: hexv.lstrip("#") for name, hexv in palette("paper")}
     return {

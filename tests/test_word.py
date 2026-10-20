@@ -11,7 +11,7 @@ import pytest
 pytest.importorskip("docx")
 from lxml import etree  # noqa: E402
 
-from fwl_visual_language import assets_dir, word  # noqa: E402
+from fwl_visual_language import assets_dir, palette, ramp, word  # noqa: E402
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 NS = {"w": W[1:-1]}
@@ -598,13 +598,48 @@ def test_the_theme_fonts_are_the_face(built):
 
 def test_the_theme_colours_are_the_paper_palette(built):
     a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    paper = {n: h.lstrip("#") for n, h in palette("paper")}
     expect = {
-        "dk1": "03090F", "lt1": "FFFFFF", "dk2": "2A343C", "lt2": "F3F6F9",
-        "accent1": "B74B21", "accent2": "0072A1", "accent3": "20A976", "accent4": "BC8D03",
-        "accent5": "4E2585", "accent6": "741721", "hlink": "0072A1", "folHlink": "003E60",
-    }  # fmt: skip
+        "dk1": ramp("ink")["900"].lstrip("#"),
+        "lt1": "FFFFFF",
+        "dk2": ramp("ink")["700"].lstrip("#"),
+        "lt2": ramp("ink")["50"].lstrip("#"),
+        "accent1": paper["magma"],
+        "accent2": paper["signal"],
+        "accent3": paper["fern"],
+        "accent4": paper["ochre"],
+        "accent5": paper["iris"],
+        "accent6": paper["garnet"],
+        "hlink": ramp("signal")["500"].lstrip("#"),
+        "folHlink": ramp("signal")["700"].lstrip("#"),
+    }
+    # independent anchors, so a token edit still trips the test
+    assert (expect["dk1"], expect["accent1"], expect["accent2"]) == ("03090F", "B74B21", "0072A1")
+    assert word.theme_colours() == expect
     for (kind, face), path in built.items():
         scheme = part(path, "word/theme/theme1.xml").find(f".//{a}clrScheme")
-        got = {k: [c.get("val") for c in scheme.find(f"{a}{k}")] for k in expect}
-        assert got == {k: [v] for k, v in expect.items()}, (kind, face)
+        assert [etree.QName(e).localname for e in scheme] == list(expect), (kind, face)
+        for slot in scheme:
+            assert [etree.QName(c).localname for c in slot] == ["srgbClr"], (kind, face)
+            assert slot[0].get("val") == expect[etree.QName(slot).localname], (kind, face)
         assert scheme.get("name") == "Forming Worlds Lab"
+
+
+def test_the_theme_colours_match_the_slide_theme_by_name():
+    """Word takes the paper step where the slides take the dark-ground step of the same colour."""
+    dark = dict(palette("dark"))
+    paper = dict(palette("paper"))
+    colours = word.theme_colours()
+    for slot, name in (("accent3", "fern"), ("accent4", "ochre"), ("accent5", "iris"), ("accent6", "garnet")):
+        assert colours[slot] == paper[name].lstrip("#") != dark[name].lstrip("#"), slot
+    assert colours["accent1"] == paper["magma"].lstrip("#")
+    assert colours["accent2"] == paper["signal"].lstrip("#")
+
+
+def test_the_link_style_has_the_colour_of_the_theme_link(built):
+    for (kind, face), path in built.items():
+        colour = style(path, "Hyperlink").find("w:rPr/w:color", NS).get(f"{W}val")
+        assert colour == word.theme_colours()["hlink"], (kind, face)
+        keyword = part(path, "word/styles.xml").xpath("//w:style[w:name/@w:val='Key word']", namespaces=NS)
+        assert len(keyword) == 1, (kind, face)
+        assert keyword[0].find("w:rPr/w:color", NS).get(f"{W}val") == word.theme_colours()["accent1"]
