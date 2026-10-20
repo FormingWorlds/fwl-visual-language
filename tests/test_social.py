@@ -1,4 +1,4 @@
-"""Social media cards: author line, card layout, text limits and the JSON spec."""
+"""Social media cards: author line, texts and their places, crops, fades, limits and the spec."""
 
 import json
 import runpy
@@ -7,12 +7,13 @@ import sys
 import pytest
 
 PIL = pytest.importorskip("PIL")
-from PIL import Image  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
-from fwl_visual_language import ramp, social  # noqa: E402
+from fwl_visual_language import assets_dir, contrast, ramp, social  # noqa: E402
 
 INK, SIGNAL = ramp("ink"), ramp("signal")
 AUTHORS = ["A One", "B Two", "C Three", "D Four", "E Five", "F Six"]
+LOGO = Image.open(assets_dir() / "fwl-logo-white.png")
 
 
 def rgb(hexv):
@@ -23,6 +24,62 @@ def near(a, b, tol=6):
     return all(abs(x - y) <= tol for x, y in zip(a, b, strict=True))
 
 
+def hexof(p):
+    return "#{:02X}{:02X}{:02X}".format(*p[:3])
+
+
+@pytest.fixture
+def drawn(monkeypatch):
+    """Record every text draw as (box, text, fill); the draw still happens."""
+    calls = []
+    real = ImageDraw.ImageDraw.text
+
+    def spy(self, xy, text, fill=None, font=None, **kw):
+        x0, y0, x1, y1 = font.getbbox(text)
+        calls.append(((xy[0] + x0, xy[1] + y0, xy[0] + x1, xy[1] + y1), text, fill))
+        return real(self, xy, text, fill=fill, font=font, **kw)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, "text", spy)
+    return calls
+
+
+def label_of(calls):
+    return "".join(t for _, t, f in calls if f == SIGNAL["400"])
+
+
+def logo_box(size, right, top, height):
+    """Box of the logo for a card of ``size`` from its design place."""
+    s = size / 1080
+    h = round(height * s)
+    w = round(LOGO.width * h / LOGO.height)
+    x1 = size - round(right * s)
+    return (x1 - w, round(top * s), x1, round(top * s) + h)
+
+
+def has_white(im):
+    """True when the image holds a near-white pixel (the white logo)."""
+    px, (w, h) = im.convert("RGB").load(), im.size
+    return any(min(px[x, y]) > 200 for x in range(w) for y in range(h))
+
+
+def overlaps(a, b):
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def fill_to(n, unit, measure):
+    """Return the longest repeat of ``unit`` that ``measure`` breaks into ``n`` lines."""
+    k = 1
+    while len(measure(unit * (k + 1))) <= n:
+        k += 1
+    assert len(measure(unit * k)) == n
+    return unit * k
+
+
+def breaker(face, px, width):
+    c = social._Card(1080)
+    return lambda text: c.lines(text, c.font(face, px), width)
+
+
 @pytest.fixture
 def photo(tmp_path):
     """A white photo, 300 x 200, with a red left third and a blue right third."""
@@ -31,6 +88,24 @@ def photo(tmp_path):
     im.paste((0, 0, 255), (200, 0, 300, 200))
     path = tmp_path / "photo.png"
     im.save(path)
+    return path
+
+
+@pytest.fixture
+def tall(tmp_path):
+    """A portrait photo, 200 x 300, in 3 horizontal bands: red, green, blue."""
+    im = Image.new("RGB", (200, 300), (0, 255, 0))
+    im.paste((255, 0, 0), (0, 0, 200, 100))
+    im.paste((0, 0, 255), (0, 200, 200, 300))
+    path = tmp_path / "tall.png"
+    im.save(path)
+    return path
+
+
+@pytest.fixture
+def white(tmp_path):
+    path = tmp_path / "white.png"
+    Image.new("RGB", (600, 600), "white").save(path)
     return path
 
 
@@ -70,57 +145,181 @@ def test_the_author_line_takes_the_shown_count():
     assert social.author_line(AUTHORS, ["B Two"], shown=1) == "A One and 5 co-authors, incl. B Two"
 
 
-@pytest.mark.parametrize("authors, shown", [([], 3), (AUTHORS, 0)])
-def test_the_author_line_refuses_no_authors(authors, shown):
-    with pytest.raises(ValueError, match="at least 1 author"):
-        social.author_line(authors, [], shown)
+@pytest.mark.parametrize(
+    "authors, lab, shown, match",
+    [
+        ([], [], 3, "at least 1 author"),
+        (AUTHORS, [], 0, "at least 1 author"),
+        (AUTHORS, "D Four", 3, "not one string"),
+        (AUTHORS, ["D. Four"], 3, "not among the authors: D. Four"),
+    ],
+)
+def test_the_author_line_refuses_bad_input(authors, lab, shown, match):
+    with pytest.raises(ValueError, match=match):
+        social.author_line(authors, lab, shown)
 
 
-def test_the_paper_card_has_the_photo_the_fades_and_the_label(tmp_path, photo):
-    out = social.paper_card(tmp_path / "p.png", photo, "A short title", AUTHORS, ["E Five"])
+@pytest.mark.parametrize("size", [1080, 540])
+def test_the_paper_card_texts_colours_and_places(tmp_path, photo, drawn, size):
+    out = social.paper_card(
+        tmp_path / "p.png", photo, "A short title", AUTHORS, ["E Five"], size=size
+    )
+    im = Image.open(out)
+    assert im.size == (size, size) and im.mode == "RGB"
+    texts = {t: (box, f) for box, t, f in drawn}
+    assert label_of(drawn) == "NEW PAPER"
+    assert texts["A short title"][1] == INK["0"]
+    line = "A One, B Two, C Three and 3 co-authors, incl. E Five"
+    assert texts[line][1] == INK["200"]
+    assert texts["A short title"][0][1] < texts[line][0][1]
+    logo = logo_box(size, 48, 40, 60)
+    for box, _, _ in drawn:
+        assert 0 <= box[0] and box[2] <= size and box[3] <= size
+        assert not overlaps(box, logo)
+    # the white logo sits in its box over the faded blue third
+    assert has_white(im.crop(logo))
+
+
+def test_the_paper_card_crop_spans_the_photo_centre(tmp_path, photo):
+    im = Image.open(social.paper_card(tmp_path / "p.png", photo, "T", ["A"])).convert("RGB")
+    # the 200 px square around the centre spans photo x 50 to 250: edges at card x 270 and 810
+    expect = [(5, (255, 0, 0)), (265, (255, 0, 0)), (275, (255, 255, 255))]
+    expect += [(805, (255, 255, 255)), (815, (0, 0, 255))]
+    for x, colour in expect:
+        assert near(im.getpixel((x, 450)), colour, 3), x
+
+
+@pytest.mark.parametrize(
+    "fy, edge, above, below",
+    [
+        (0, 540, (255, 0, 0), (0, 255, 0)),
+        (0.5, 270, (255, 0, 0), (0, 255, 0)),
+        (1, 540, (0, 255, 0), (0, 0, 255)),
+    ],
+)
+def test_a_portrait_photo_crops_along_the_focus(tmp_path, tall, fy, edge, above, below):
+    out = social.member_card(tmp_path / "m.png", tall, "N", [], focus=(0.5, fy))
     im = Image.open(out).convert("RGB")
-    assert im.size == (1080, 1080)
-    # the 200 px square around the centre spans photo x 50 to 250: red, white, blue
-    assert near(im.getpixel((540, 400)), (255, 255, 255), 2)
-    assert near(im.getpixel((5, 400)), (255, 0, 0), 2)
-    assert near(im.getpixel((1075, 480)), (0, 0, 255), 2)
-    assert near(im.getpixel((540, 1079)), rgb(INK["950"]), 8)
-    assert im.getpixel((540, 2))[0] < 120
-    labels = [im.getpixel((x, y)) for x in range(48, 200) for y in range(700, 1000)]
-    assert any(near(p, rgb(SIGNAL["400"]), 30) for p in labels)
+    assert near(im.getpixel((540, edge - 5)), above, 3)
+    assert near(im.getpixel((540, edge + 5)), below, 3)
 
 
-def test_the_photo_crop_follows_the_focus(tmp_path, photo):
+def test_a_landscape_photo_crops_along_the_focus(tmp_path, photo):
     left = Image.open(social.paper_card(tmp_path / "l.png", photo, "T", ["A"], focus=(0, 0.5)))
     right = Image.open(social.paper_card(tmp_path / "r.png", photo, "T", ["A"], focus=(1, 0.5)))
-    assert near(left.convert("RGB").getpixel((100, 400)), (255, 0, 0), 2)
-    assert near(right.convert("RGB").getpixel((1000, 400)), (0, 0, 255), 2)
+    assert near(left.getpixel((100, 400)), (255, 0, 0), 2)
+    assert near(right.getpixel((1000, 400)), (0, 0, 255), 2)
 
 
-def test_the_paper_card_refuses_a_long_title(tmp_path, photo):
-    with pytest.raises(ValueError, match="3 lines"):
-        social.paper_card(tmp_path / "p.png", photo, "word " * 60, AUTHORS)
+def test_the_exif_orientation_is_applied(tmp_path):
+    # stored 300 x 200 with red left and blue right; orientation 6 shows it turned: red on top
+    im = Image.new("RGB", (300, 200), "white")
+    im.paste((255, 0, 0), (0, 0, 100, 200))
+    im.paste((0, 0, 255), (200, 0, 300, 200))
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    path = tmp_path / "rot.jpg"
+    im.save(path, exif=exif, quality=95)
+    out = social.member_card(tmp_path / "m.png", path, "N", [], focus=(0.5, 0))
+    assert near(Image.open(out).convert("RGB").getpixel((540, 260)), (255, 0, 0), 25)
 
 
-def test_a_word_wider_than_the_card_is_refused(tmp_path):
-    with pytest.raises(ValueError, match="wider than the card"):
-        social.glance_card(tmp_path / "g.png", "x" * 200, "ref")
-
-
-def test_the_glance_card_holds_15_lines(tmp_path):
-    out = social.glance_card(tmp_path / "g.png", "word " * 100, "arXiv:0000.00000")
+def test_the_text_sits_on_a_dark_ground_on_a_white_photo(tmp_path, white, drawn):
+    title = (
+        "Evolutionary pathways toward survival of a thick atmosphere on the lava world TOI-561 b"
+    )
+    out = social.paper_card(tmp_path / "p.png", white, title, AUTHORS, ["E Five"])
     im = Image.open(out).convert("RGB")
+    top = round(min(box[1] for box, _, f in drawn if f == SIGNAL["400"]))
+    ground = hexof(im.getpixel((20, top)))
+    assert contrast(SIGNAL["400"], ground) >= 4.5
+    assert contrast(INK["0"], ground) >= 12
+    # the fade darkens without a step back towards light, from its start to the foot
+    column = [sum(im.getpixel((20, y))) for y in range(top - 200, 1080)]
+    assert all(b <= a + 1 for a, b in zip(column, column[1:], strict=False))
+    assert column[0] > 700
+    # the top fade keeps the corner darker than the white middle
+    assert sum(im.getpixel((20, 2))) < sum(im.getpixel((20, 400))) - 200
+
+
+def test_the_glance_card(tmp_path, drawn):
+    social.glance_card(tmp_path / "g.png", "Some words here.", "arXiv:0000.00000")
+    assert label_of(drawn) == "AT A GLANCE"
+    texts = {t: f for _, t, f in drawn}
+    assert texts["Some words here."] == INK["100"] and texts["arXiv:0000.00000"] == INK["400"]
+    im = Image.open(tmp_path / "g.png")
     assert near(im.getpixel((5, 5)), rgb(INK["950"]), 1)
-    with pytest.raises(ValueError, match="the card holds 15"):
-        social.glance_card(tmp_path / "g2.png", "word " * 400, "ref")
+    assert has_white(im.crop(logo_box(1080, 64, 968, 60)))
 
 
-def test_the_figure_card_sets_the_figure_on_a_white_panel(tmp_path, figure):
-    im = Image.open(
-        social.figure_card(tmp_path / "f.png", figure, "A headline", "Source", "ref")
-    ).convert("RGB")
+@pytest.mark.parametrize(
+    "card, face, px, width, n",
+    [
+        ("glance", "Regular", 41, 1080 - 128, 15),
+        ("cover", "Light", 86, 1080 - 128, 6),
+        ("paper", "SemiBold", 40, 1080 - 96, 3),
+        ("figure", "SemiBold", 46, 1080 - 96, 2),
+    ],
+)
+def test_each_text_limit_holds_n_lines_and_refuses_one_more(
+    tmp_path, photo, figure, card, face, px, width, n
+):
+    exact = fill_to(n, "word ", breaker(face, px, width))
+    longer = exact + "word " * 8
+    make = {
+        "glance": lambda t, o: social.glance_card(o, t, "ref"),
+        "cover": lambda t, o: social.cover_card(o, t, "Lead", "ref"),
+        "paper": lambda t, o: social.paper_card(o, photo, t, ["A"]),
+        "figure": lambda t, o: social.figure_card(o, figure, t, "Source", "ref"),
+    }[card]
+    make(exact, tmp_path / "ok.png")
+    with pytest.raises(ValueError, match="holds"):
+        make(longer, tmp_path / "no.png")
+
+
+def test_the_author_line_holds_2_lines(tmp_path, photo):
+    names = [f"Author{i:02d} Surname{i:02d}" for i in range(40)]
+    with pytest.raises(ValueError, match="author line 2"):
+        social.paper_card(tmp_path / "p.png", photo, "T", names, names[3:])
+
+
+@pytest.mark.parametrize(
+    "make, match",
+    [
+        (lambda o, f, p: social.glance_card(o, "t", "ref " * 30), "holds 1"),
+        (lambda o, f, p: social.cover_card(o, "Q", "Lead", "ref " * 30), "holds 1"),
+        (lambda o, f, p: social.cover_card(o, "Q", "Lead " * 20, "ref"), "holds 1"),
+        (lambda o, f, p: social.figure_card(o, f, "H", "Source " * 30, "ref"), "holds 1"),
+        (lambda o, f, p: social.figure_card(o, f, "H", "Source", "ref " * 30), "holds 1"),
+        (lambda o, f, p: social.glance_card(o, "t", "ref", label="label " * 20), "label is wider"),
+        (
+            lambda o, f, p: social.event_card(o, "E", "W", "H", [("A", "detail " * 20)]),
+            "wider than its",
+        ),
+        (lambda o, f, p: social.event_card(o, "Event " * 10, "W", "H", []), "holds 1"),
+        (lambda o, f, p: social.event_card(o, "E", "W " * 60, "H", []), "holds 1"),
+        (lambda o, f, p: social.event_card(o, "E", "W", "H", [("A", "1")] * 8), "7 entries"),
+        (lambda o, f, p: social.member_card(o, p, "Name " * 20, []), "holds 1"),
+        (lambda o, f, p: social.member_card(o, p, "N", ["1", "2", "3"]), "up to 2 lines"),
+        (lambda o, f, p: social.member_card(o, p, "N", "Role"), "up to 2 lines"),
+        (lambda o, f, p: social.glance_card(o, "   ", "ref"), "empty"),
+        (lambda o, f, p: social.glance_card(o, "x" * 200, "ref"), "wider than the card"),
+    ],
+)
+def test_texts_that_do_not_fit_are_refused(tmp_path, figure, photo, make, match):
+    with pytest.raises(ValueError, match=match):
+        make(tmp_path / "x.png", figure, photo)
+
+
+def test_the_figure_card(tmp_path, figure, drawn):
+    im = Image.open(social.figure_card(tmp_path / "f.png", figure, "A headline", "Source", "ref"))
     assert near(im.getpixel((540, 450)), (200, 30, 30), 3)
     assert near(im.getpixel((52, 450)), (255, 255, 255), 2)
+    texts = {t: f for _, t, f in drawn}
+    assert texts["A headline"] == INK["0"] and texts["Source"] == INK["300"]
+    logo = logo_box(1080, 48, 984, 52)
+    assert not any(overlaps(b, logo) for b, _, _ in drawn)
+    assert has_white(im.crop(logo))
 
 
 def test_the_figure_card_refuses_a_tall_figure(tmp_path):
@@ -130,75 +329,76 @@ def test_the_figure_card_refuses_a_tall_figure(tmp_path):
         social.figure_card(tmp_path / "f.png", tall, "Headline", "Source", "ref")
 
 
-def test_the_cover_card_and_its_limits(tmp_path):
-    im = Image.open(
-        social.cover_card(tmp_path / "c.png", "Can a world keep its air?", "Led by A", "ref")
-    )
-    assert im.size == (1080, 1080)
-    with pytest.raises(ValueError, match="the card holds 6"):
-        social.cover_card(tmp_path / "c2.png", "word " * 80, "Led by A", "ref")
+def test_the_cover_card(tmp_path, drawn):
+    social.cover_card(tmp_path / "c.png", "Can a world keep its air?", "Led by A", "ref")
+    assert label_of(drawn) == "NEW PAPER"
+    texts = [t for _, t, f in drawn if f == INK["0"]]
+    assert " ".join(texts) == "Can a world keep its air?"
+    assert {t for _, t, _ in drawn} >= {"Led by A", "ref"}
 
 
-def test_the_member_card_and_its_limits(tmp_path, photo):
-    im = Image.open(
-        social.member_card(tmp_path / "m.png", photo, "A Name", ["Role", "Path"])
-    ).convert("RGB")
-    assert near(im.getpixel((540, 1079)), rgb(INK["950"]), 8)
-    with pytest.raises(ValueError, match="2 lines under the name"):
-        social.member_card(tmp_path / "m2.png", photo, "A Name", ["1", "2", "3"])
+def test_the_member_card(tmp_path, photo, drawn):
+    im = Image.open(social.member_card(tmp_path / "m.png", photo, "A Name", ["Role", "Path"]))
+    assert label_of(drawn) == "MEET THE LAB"
+    texts = {t: (b, f) for b, t, f in drawn}
+    assert texts["A Name"][1] == INK["0"] and texts["Role"][1] == INK["200"]
+    assert texts["A Name"][0][1] < texts["Role"][0][1] < texts["Path"][0][1]
+    # ink-950 at alpha 235 over the white middle of the photo
+    assert near(im.getpixel((540, 1079)), (21, 23, 25), 2)
 
 
-def test_the_event_card_right_aligns_the_details(tmp_path):
-    entries = [("A One", "poster 1"), ("B Two", "poster 22")]
-    im = Image.open(
-        social.event_card(tmp_path / "e.png", "Event", "Place", "2 posters", entries)
-    ).convert("RGB")
-    row = [im.getpixel((x, 392 + 20)) for x in range(900, 1016)]
-    assert any(p[0] > 100 for p in row)
-    assert all(p[0] < 30 for p in [im.getpixel((x, 412)) for x in range(1017, 1080)])
-    with pytest.raises(ValueError, match="7 entries"):
-        social.event_card(tmp_path / "e2.png", "Event", "Place", "Many", [("A", "1")] * 8)
+@pytest.mark.parametrize("size", [1080, 540])
+def test_the_event_card_right_aligns_every_detail(tmp_path, drawn, size):
+    entries = [("A One", "poster 1"), ("B Two", "poster 22"), ("C Three", "talk")]
+    social.event_card(tmp_path / "e.png", "Event", "Place", "3 posters", entries, size=size)
+    ends = {t: b[2] for b, t, _ in drawn}
+    edge = size - round(64 * size / 1080)
+    assert all(abs(ends[t] - edge) <= 3 for t in ("poster 1", "poster 22", "talk"))
+    assert label_of(drawn) == "AT THE CONFERENCE"
 
 
-def test_the_highlight_cover_darkens_the_detail_and_centres_the_label(tmp_path):
+def test_the_highlight_cover_crops_the_box_darkens_it_and_centres_the_label(tmp_path, drawn):
     art = tmp_path / "art.png"
-    Image.new("RGB", (400, 300), (255, 255, 255)).save(art)
-    im = Image.open(social.highlight_card(tmp_path / "h.png", art, (0, 0, 300), "Results")).convert(
-        "RGB"
-    )
-    corner = im.getpixel((5, 5))
-    assert 120 < corner[0] < 160
-    centre = [im.getpixel((x, 540)) for x in range(300, 780)]
-    assert any(near(p, (255, 255, 255), 3) for p in centre)
-    for box in [(200, 0, 300), (-1, 0, 10), (0, 0, 0)]:
-        with pytest.raises(ValueError, match="not inside the artwork"):
-            social.highlight_card(tmp_path / "h2.png", art, box, "Results")
+    im = Image.new("RGB", (400, 300), (0, 255, 0))
+    im.paste((255, 255, 255), (100, 50, 300, 250))
+    im.save(art)
+    out = Image.open(social.highlight_card(tmp_path / "h.png", art, (100, 50, 200), "Results"))
+    over = tuple(round(255 * (1 - 120 / 255) + c * 120 / 255) for c in rgb(INK["950"]))
+    assert near(out.getpixel((5, 5)), over, 2)
+    ((box, text, fill),) = drawn
+    assert text == "Results" and fill == INK["0"]
+    assert abs((box[0] + box[2]) / 2 - 540) <= 3 and abs((box[1] + box[3]) / 2 - 540) <= 40
+
+
+@pytest.mark.parametrize("box", [(200, 0, 300), (0, 150, 200), (-1, 0, 10), (0, -1, 10), (0, 0, 0)])
+def test_the_highlight_box_must_lie_inside_the_artwork(tmp_path, box):
+    art = tmp_path / "art.png"
+    Image.new("RGB", (400, 300)).save(art)
+    with pytest.raises(ValueError, match="not inside the artwork"):
+        social.highlight_card(tmp_path / "h.png", art, box, "Results")
+
+
+@pytest.mark.parametrize("box", [(100, 0, 300), (0, 0, 300)])
+def test_a_box_on_the_artwork_edge_is_accepted(tmp_path, box):
+    art = tmp_path / "art.png"
+    Image.new("RGB", (400, 300)).save(art)
+    assert social.highlight_card(tmp_path / "h.png", art, box, "Talks").is_file()
+
+
+def test_the_highlight_label_holds_2_lines(tmp_path):
+    art = tmp_path / "art.png"
+    Image.new("RGB", (400, 300)).save(art)
     with pytest.raises(ValueError, match="cover holds 2"):
         social.highlight_card(
-            tmp_path / "h3.png",
-            art,
-            (0, 0, 300),
-            "Many words in this very long label for one cover",
+            tmp_path / "h.png", art, (0, 0, 300), "Many words in this very long label"
         )
 
 
-def test_a_smaller_size_scales_the_whole_card(tmp_path, photo):
-    im = Image.open(social.paper_card(tmp_path / "s.png", photo, "Title", AUTHORS, size=540))
-    assert im.size == (540, 540)
-
-
-def test_render_reads_a_spec_with_paths_relative_to_its_base(tmp_path, photo):
+def test_render_reads_a_spec_with_paths_relative_to_its_base(tmp_path, photo, figure):
     spec = {
         "base": str(photo.parent),
         "cards": [
-            {
-                "card": "paper",
-                "file": "one",
-                "photo": photo.name,
-                "title": "T",
-                "authors": ["A"],
-                "focus": [0.5, 0.5],
-            },
+            {"card": "paper", "file": "one", "photo": photo.name, "title": "T", "authors": ["A"]},
             {
                 "card": "event",
                 "file": "two",
@@ -214,54 +414,68 @@ def test_render_reads_a_spec_with_paths_relative_to_its_base(tmp_path, photo):
                 "box": [0, 0, 200],
                 "label": "Talks",
             },
+            {
+                "card": "figure",
+                "file": "four",
+                "figure": figure.name,
+                "headline": "H",
+                "source": "S",
+                "ref": "r",
+            },
         ],
     }
     written = social.render(spec, tmp_path / "out")
-    assert [p.name for p in written] == ["one.png", "two.png", "three.png"]
+    assert [p.name for p in written] == ["one.png", "two.png", "three.png", "four.png"]
     assert all(p.is_file() for p in written)
 
 
+GOOD = {"card": "glance", "file": "a", "text": "t", "ref": "r"}
+
+
 @pytest.mark.parametrize(
-    "cards, match",
+    "spec, match",
     [
-        ([{"card": "glance", "file": "a", "text": "t", "ref": "r"}] * 2, "share a file name"),
-        ([{"card": "poster", "file": "a"}], "unknown card"),
+        ([GOOD], "'cards' list"),
+        ({}, "'cards' list"),
+        ({"cards": [GOOD, dict(GOOD, file="A")]}, "share the file name"),
+        ({"cards": [GOOD, {"card": "poster", "file": "b"}]}, "unknown card"),
+        ({"cards": [GOOD, {"file": "b"}]}, "needs 'card' and 'file'"),
+        ({"cards": [GOOD, dict(GOOD, file="../b")]}, "plain name"),
+        ({"cards": [GOOD, dict(GOOD, file="b/c")]}, "plain name"),
+        ({"cards": [GOOD, dict(GOOD, file="b", colour="red")]}, "unknown keys: colour"),
+        ({"cards": [GOOD, dict(GOOD, file="b", out="x")]}, "unknown keys: out"),
     ],
 )
-def test_render_refuses_a_bad_spec(tmp_path, cards, match):
+def test_render_checks_the_whole_spec_before_writing(tmp_path, spec, match):
     with pytest.raises(ValueError, match=match):
-        social.render({"cards": cards}, tmp_path)
+        social.render(spec, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
 
 
 def test_the_command_line_resolves_images_next_to_the_spec(tmp_path, photo, capsys):
+    (tmp_path / "img").mkdir()
+    photo.rename(tmp_path / "img" / "p.png")
     spec = tmp_path / "cards.json"
-    spec.write_text(
-        json.dumps(
-            {
-                "cards": [
-                    {
-                        "card": "member",
-                        "file": "m",
-                        "photo": photo.name,
-                        "name": "N",
-                        "lines": ["R"],
-                    }
-                ]
-            }
-        )
-    )
+    card = {"card": "member", "file": "m", "photo": "p.png", "name": "N", "lines": ["R"]}
+    spec.write_text(json.dumps({"base": "img", "cards": [card]}))
     assert social.main([str(spec), str(tmp_path / "out")]) == 0
     assert (tmp_path / "out" / "m.png").is_file()
     assert "m.png" in capsys.readouterr().out
 
 
+def test_the_command_line_reports_a_card_that_does_not_fit(tmp_path, capsys):
+    spec = tmp_path / "cards.json"
+    card = {"card": "glance", "file": "g", "text": "word " * 400, "ref": "r"}
+    spec.write_text(json.dumps({"cards": [card]}))
+    assert social.main([str(spec), str(tmp_path / "out")]) == 1
+    assert "error:" in capsys.readouterr().err
+
+
 def test_the_module_runs_as_a_script(tmp_path, monkeypatch):
     spec = tmp_path / "cards.json"
-    spec.write_text(
-        json.dumps({"cards": [{"card": "glance", "file": "g", "text": "t", "ref": "r"}]})
-    )
+    spec.write_text(json.dumps({"cards": [GOOD]}))
     monkeypatch.setattr(sys, "argv", ["social", str(spec), str(tmp_path / "out")])
     with pytest.raises(SystemExit) as exit_:
         runpy.run_module("fwl_visual_language.social", run_name="__main__")
     assert exit_.value.code == 0
-    assert (tmp_path / "out" / "g.png").is_file()
+    assert (tmp_path / "out" / "a.png").is_file()

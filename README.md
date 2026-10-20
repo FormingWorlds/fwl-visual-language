@@ -77,7 +77,7 @@ pip install "fwl-visual-language[social]"
 python -m fwl_visual_language.social cards.json cards/
 ```
 
-The command renders square 1080 px PNG cards for Bluesky, Mastodon, Instagram and LinkedIn, on the ink ground with Geist, signal-blue labels and the lab logo. `cards.json` lists the cards; each entry names its `card`, its output `file` and the arguments of that card, and image paths resolve next to the JSON file:
+The command renders square 1080 px PNG cards for Bluesky, Mastodon, Instagram and LinkedIn, set in Geist on the ink ground or on a photo darkened towards ink, with signal-blue labels and the lab logo. `cards.json` holds a `cards` list; each entry names its `card`, its output `file` (the name without `.png`) and the arguments of that card. Image paths resolve next to the JSON file, or in the folder that an optional `base` key names relative to it. The example needs `first-author.jpg` next to `cards.json`:
 
 ```json
 {"cards": [
@@ -93,11 +93,11 @@ The command renders square 1080 px PNG cards for Bluesky, Mastodon, Instagram an
 | `glance` | the At a glance text of the paper, up to 15 lines |
 | `figure` | a headline, the figure on a white panel and its source |
 | `cover` | the question the paper answers, as the first slide of a carousel |
-| `member` | a member's photo with name and 2 short lines |
+| `member` | a member's photo with the name and up to 2 short lines |
 | `event` | a conference with up to 7 lab contributions |
 | `highlight` | an Instagram Story Highlight cover from a square detail of an artwork |
 
-A text that does not fit its card stops the command with an error instead of running off the card. Photos and artwork are not in this repository; the cards take them from the caller.
+Every text is measured: a text that does not fit its card, a lab member who is not among the authors, or an unknown key stops the command with an error before a wrong card goes out. The command checks the whole list before it writes the first card. Photos and artwork are not in this repository; the cards take them from the caller.
 
 ## Develop
 
