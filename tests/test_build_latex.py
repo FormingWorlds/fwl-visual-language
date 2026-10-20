@@ -247,8 +247,8 @@ def test_proposal_compiles_with_inter_and_stix_math(tmp_path):
     assert {
         "Inter-Regular",
         "Inter-Italic",
-        "Inter-Medium",
-        "Inter-MediumItalic",
+        "Inter-SemiBold",
+        "Inter-SemiBoldItalic",
         "STIXTwoMath-Regular",
         "Geist-Regular",
         "Geist-Medium",
@@ -293,3 +293,35 @@ def test_math_loads_once_and_only_in_the_preamble(tmp_path):
     )
     assert run.returncode != 0
     assert "Can be used only in preamble" in (tmp_path / "b.log").read_text(errors="replace")
+
+
+@pytest.mark.skipif(not (shutil.which("lualatex") and shutil.which("pdffonts")), reason="no TeX")
+def test_bm_and_boldsymbol_give_bold_math_with_or_without_the_bm_package(tmp_path):
+    """Each case typesets 1 bold symbol, so the embedded fonts show its face alone."""
+    latex.install_latex(tmp_path)
+    preambles = {
+        "none": "\\usepackage{fwlproposal}",
+        "ams": "\\usepackage{amsmath}\\usepackage{fwlproposal}",
+        "bmfirst": "\\usepackage{amsmath}\\usepackage{bm}\\usepackage{fwlproposal}",
+        "bmlast": "\\usepackage{fwlproposal}\\usepackage{bm}",
+    }
+    cases = {"letter": ("y", "Inter-SemiBoldItalic"), "digit": ("1", "Inter-SemiBold")}
+    for pre_name, pre in preambles.items():
+        for cmd in ("bm", "boldsymbol"):
+            if cmd == "boldsymbol" and pre_name == "none":
+                continue
+            for case, (symbol, face) in cases.items():
+                name = f"{pre_name}-{cmd}-{case}"
+                (tmp_path / f"{name}.tex").write_text(
+                    f"\\documentclass{{article}}{pre}\\pagestyle{{empty}}"
+                    f"\\begin{{document}}$\\{cmd}{{{symbol}}}$\\end{{document}}\n"
+                )
+                names = _lualatex(tmp_path, name)
+                inter = {n for n in names if n.startswith("Inter")}
+                assert inter == {face}, (name, names)
+    # without the math option the bm package keeps its own \\bm
+    (tmp_path / "plain.tex").write_text(
+        "\\documentclass{article}\\usepackage{fwl}\\usepackage{bm}"
+        "\\begin{document}$\\bm{y}$\\end{document}\n"
+    )
+    assert not {n for n in _lualatex(tmp_path, "plain") if n.startswith("Inter")}

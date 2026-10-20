@@ -84,8 +84,9 @@
   FontFace={md}{n}{GeistMono-Medium.ttf}]
 \newcommand{\fwlmedium}{\fontseries{md}\selectfont}
 
-% Math: letters, digits and Greek from Inter (Medium for bold), everything
+% Math: letters, digits and Greek from Inter (SemiBold for bold), everything
 % else from STIX Two. The math option or \fwlusemath in the preamble loads it once.
+% \bm and \boldsymbol give bold italic letters and Greek and bold upright digits.
 \newif\iffwl@mathdone
 \newcommand{\fwlusemath}{\iffwl@mathdone\else\global\fwl@mathdonetrue
   \RequirePackage{unicode-math}
@@ -94,12 +95,15 @@
     range={up/{latin,Latin,num,greek,Greek}}]
   \setmathfont{Inter-Italic.ttf}[Path=\fwlfontpath,
     range={it/{latin,Latin,greek,Greek}}]
-  \setmathfont{Inter-Medium.ttf}[Path=\fwlfontpath,
+  \setmathfont{Inter-SemiBold.ttf}[Path=\fwlfontpath,
     range={bfup/{latin,Latin,num,greek,Greek}}]
-  \setmathfont{Inter-MediumItalic.ttf}[Path=\fwlfontpath,
+  \setmathfont{Inter-SemiBoldItalic.ttf}[Path=\fwlfontpath,
     range={bfit/{latin,Latin,greek,Greek}}]
 \fi}
 \@onlypreamble\fwlusemath
+\newcommand{\fwl@bm}[1]{\symbf{\symbfit{#1}}}
+\AtBeginDocument{\iffwl@mathdone\providecommand{\bm}{}%
+  \let\bm\fwl@bm\let\boldsymbol\fwl@bm\fi}
 \iffwl@math\fwlusemath\fi
 \color{fwlText}
 \endinput
