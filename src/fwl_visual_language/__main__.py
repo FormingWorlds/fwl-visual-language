@@ -9,7 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import beamer, css, documenter, jupyterbook, latex, mpl
+from . import beamer, css, documenter, jupyterbook, latex, mpl, poster
 
 __all__ = ["OUTPUTS", "build", "check", "main"]
 
@@ -24,6 +24,7 @@ OUTPUTS = {
     "jupyterbook/fwl-jupyterbook.css": jupyterbook.jupyterbook_css,
     "latex/fwl.sty": latex.sty,
     "latex/fwlproposal.sty": latex.proposal_sty,
+    "latex/fwlposter.sty": poster.poster_sty,
     "beamer/beamerthemefwl.sty": beamer.beamer_theme,
 }
 
