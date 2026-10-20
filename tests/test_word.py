@@ -643,8 +643,10 @@ def test_the_theme_accents_are_the_paper_steps_of_the_slide_accents():
 
 def test_the_link_style_has_the_colour_of_the_theme_link(built):
     for (kind, face), path in built.items():
-        colour = style(path, "Hyperlink").find("w:rPr/w:color", NS).get(f"{W}val")
-        assert colour == word.theme_colours()["hlink"], (kind, face)
+        for sid, slot in (("Hyperlink", "hlink"), ("FollowedHyperlink", "folHlink")):
+            rpr = style(path, sid).find("w:rPr", NS)
+            assert rpr.find("w:color", NS).get(f"{W}val") == word.theme_colours()[slot], sid
+            assert rpr.find("w:u", NS).get(f"{W}val") == "single", (kind, face, sid)
         keyword = part(path, "word/styles.xml").xpath(
             "//w:style[w:name/@w:val='Key word']", namespaces=NS
         )

@@ -337,7 +337,8 @@ class _Builder:
             self.leader_tab(st)
         self.tracking(self.doc.styles["Memo label"].element.get_or_add_rPr(), 2)
         c = WD_STYLE_TYPE.CHARACTER
-        self.style("Hyperlink", color=_hex("signal", "500"), kind=c)
+        for name, slot in (("Hyperlink", "hlink"), ("FollowedHyperlink", "folHlink")):
+            self.style(name, color=theme_colours()[slot], kind=c).font.underline = True
         self.style("Key word", color=_hex("magma", "600"), face=f["medium"], kind=c)
         self.numbering()
         self.link(h1, HEADING_NUM, 0)
