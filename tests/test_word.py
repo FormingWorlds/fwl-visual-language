@@ -11,7 +11,7 @@ import pytest
 pytest.importorskip("docx")
 from lxml import etree  # noqa: E402
 
-from fwl_visual_language import assets_dir, word  # noqa: E402
+from fwl_visual_language import assets_dir, palette, ramp, word  # noqa: E402
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 NS = {"w": W[1:-1]}
@@ -84,7 +84,7 @@ def test_styles_set_the_face_size_and_colour(built, face):
     regular, light, medium = FACE[face]
     path = built["report", face]
     expect = {
-        "Normal": (regular, "21", "03090F"),
+        "Normal": (regular, "21", None),  # the colour is a document default
         "Title": (light, "48", "010305"),
         "Subtitle": (regular, "24", "475159"),
         "Heading1": (medium, "26", "010305"),
@@ -386,10 +386,10 @@ def test_pages_are_a4_with_the_lab_margins(built):
     "sid, face, size, color",
     [
         ("Header", 0, "15", "6B747C"),
-        ("Heading3", 2, "21", "03090F"),
-        ("ListNumber", 0, "21", "03090F"),
-        ("ListNumber2", 0, "21", "03090F"),
-        ("ListBullet", 0, "21", "03090F"),
+        ("Heading3", 2, "21", None),
+        ("ListNumber", 0, "21", None),
+        ("ListNumber2", 0, "21", None),
+        ("ListBullet", 0, "21", None),
         ("Byline", 0, "18", "6B747C"),
         ("Subject", 2, "22", "010305"),
         ("Dateline", 0, "19", "475159"),
@@ -594,3 +594,96 @@ def test_the_theme_fonts_are_the_face(built):
         minor = scheme.find(f"{a}minorFont/{a}latin").get("typeface")
         assert (major, minor) == (FACE[face][2], FACE[face][0]), (kind, face)
         assert scheme.get("name") == "Forming Worlds Lab"
+
+
+def test_the_theme_colours_are_the_paper_palette(built):
+    a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    paper = {n: h.lstrip("#") for n, h in palette("paper")}
+    expect = {
+        "dk1": ramp("ink")["900"].lstrip("#"),
+        "lt1": "FFFFFF",
+        "dk2": ramp("ink")["700"].lstrip("#"),
+        "lt2": ramp("ink")["50"].lstrip("#"),
+        "accent1": paper["magma"],
+        "accent2": paper["signal"],
+        "accent3": paper["fern"],
+        "accent4": paper["ochre"],
+        "accent5": paper["iris"],
+        "accent6": paper["garnet"],
+        "hlink": ramp("signal")["500"].lstrip("#"),
+        "folHlink": paper["iris"],
+    }
+    # independent anchors, so a token edit still trips the test
+    assert (expect["dk1"], expect["accent1"], expect["accent2"]) == ("03090F", "B74B21", "0072A1")
+    assert word.theme_colours() == expect
+    for (kind, face), path in built.items():
+        scheme = part(path, "word/theme/theme1.xml").find(f".//{a}clrScheme")
+        assert [etree.QName(e).localname for e in scheme] == list(expect), (kind, face)
+        for slot in scheme:
+            assert [etree.QName(c).localname for c in slot] == ["srgbClr"], (kind, face)
+            assert slot[0].get("val") == expect[etree.QName(slot).localname], (kind, face)
+        assert scheme.get("name") == "Forming Worlds Lab"
+
+
+def test_the_theme_accents_are_the_paper_steps_of_the_slide_accents():
+    """Word takes the paper step where the slides take the dark-ground step of the same colour."""
+    dark = dict(palette("dark"))
+    paper = dict(palette("paper"))
+    colours = word.theme_colours()
+    for slot, name in (
+        ("accent3", "fern"),
+        ("accent4", "ochre"),
+        ("accent5", "iris"),
+        ("accent6", "garnet"),
+    ):
+        assert colours[slot] == paper[name].lstrip("#") != dark[name].lstrip("#"), slot
+    assert colours["accent1"] == paper["magma"].lstrip("#")
+    assert colours["accent2"] == paper["signal"].lstrip("#")
+
+
+def test_the_link_style_has_the_colour_of_the_theme_link(built):
+    for (kind, face), path in built.items():
+        for sid, slot in (("Hyperlink", "hlink"), ("FollowedHyperlink", "folHlink")):
+            rpr = style(path, sid).find("w:rPr", NS)
+            assert rpr.find("w:color", NS).get(f"{W}val") == word.theme_colours()[slot], sid
+            assert rpr.find("w:u", NS).get(f"{W}val") == "single", (kind, face, sid)
+        keyword = part(path, "word/styles.xml").xpath(
+            "//w:style[w:name/@w:val='Key word']", namespaces=NS
+        )
+        assert len(keyword) == 1, (kind, face)
+        assert (
+            keyword[0].find("w:rPr/w:color", NS).get(f"{W}val") == word.theme_colours()["accent1"]
+        )
+
+
+def test_the_text_colour_is_a_document_default_so_table_styles_can_set_their_own(built):
+    ink = ramp("ink")["900"].lstrip("#")
+    for (kind, face), path in built.items():
+        styles = part(path, "word/styles.xml")
+        default = styles.find("w:docDefaults/w:rPrDefault/w:rPr/w:color", NS)
+        assert default is not None and default.get(f"{W}val") == ink, (kind, face)
+        for sid in ("Normal", "Heading3", "ListBullet", "ListNumber", "ListNumber2"):
+            assert style(path, sid).find("w:rPr/w:color", NS) is None, (kind, face, sid)
+        header = style(path, "MediumShading1-Accent3").find(
+            "w:tblStylePr[@w:type='firstRow']/w:rPr/w:color", NS
+        )
+        assert header.get(f"{W}val") == "FFFFFF", (kind, face)
+
+
+def contrast(a, b):
+    def lum(h):
+        c = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def test_white_header_text_on_the_accents_meets_the_readme_contrast():
+    """The README says white on fern and ochre reaches 3:1 and the other accents suit small text."""
+    colours = word.theme_colours()
+    for slot in ("accent1", "accent2", "accent5", "accent6"):
+        assert contrast("FFFFFF", colours[slot]) >= 4.5, slot
+    for slot in ("accent3", "accent4"):
+        assert 3.0 <= contrast("FFFFFF", colours[slot]) < 4.5, slot

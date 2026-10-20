@@ -22,7 +22,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 
-from . import assets_dir, ramp
+from . import assets_dir, palette, ramp
 
 __all__ = ["FACES", "KINDS", "build_word", "template_name"]
 
@@ -196,7 +196,7 @@ class _Builder:
         return st
 
     def theme(self):
-        """Point the theme fonts (+Headings, +Body in Word's font menu) at the face."""
+        """Point the theme fonts and colours at the face and the paper palette."""
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
         from lxml import etree
 
@@ -207,6 +207,13 @@ class _Builder:
         scheme.set("name", "Forming Worlds Lab")
         for tag, face in (("majorFont", self.f["medium"]), ("minorFont", self.f["regular"])):
             scheme.find(f"{a}{tag}/{a}latin").set("typeface", face)
+        colours = root.find(f".//{a}clrScheme")
+        colours.set("name", "Forming Worlds Lab")
+        for key, value in theme_colours().items():
+            el = colours.find(f"{a}{key}")
+            for child in list(el):
+                el.remove(child)
+            etree.SubElement(el, f"{a}srgbClr", val=value)
         part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
     def numbering(self):
@@ -273,8 +280,15 @@ class _Builder:
         f, ink = self.f, lambda s: _hex("ink", s)
         rpr = self.doc.styles.element.find(self.qn("w:docDefaults")).find(self.qn("w:rPrDefault"))
         self.fonts(rpr.find(self.qn("w:rPr")), f["regular"])
-        normal = self.style("Normal", 10.5, ink("900"), after=6)
+        # the text colour sits in the defaults, so a table style can set its own
+        colour = self.E("w:color")
+        colour.set(self.qn("w:val"), ink("900"))
+        rpr.find(self.qn("w:rPr")).insert_element_before(colour, *rpr_successors("w:color"))
+        normal = self.style("Normal", 10.5, None, after=6)
         normal.paragraph_format.line_spacing = 1.2
+        for name in ("Normal", "Heading 3", "List Bullet", "List Number", "List Number 2"):
+            for el in self.doc.styles[name].element.get_or_add_rPr().findall(self.qn("w:color")):
+                el.getparent().remove(el)
         title = self.style("Title", 24, ink("950"), f["light"], before=18, after=2)
         subtitle = self.style("Subtitle", 12, ink("600"), after=4)
         if self.chapters == "A":
@@ -283,7 +297,7 @@ class _Builder:
             h1 = self.style("Heading 1", 20, ink("950"), f["light"], before=0, after=18)
             h1.paragraph_format.page_break_before = True
         h2 = self.style("Heading 2", 11, ink("950"), f["medium"], before=12, after=4)
-        h3 = self.style("Heading 3", 10.5, ink("900"), f["medium"], before=10, after=3)
+        h3 = self.style("Heading 3", 10.5, None, f["medium"], before=10, after=3)
         for st in (title, subtitle, h1, h2, h3):
             ppr = st.element.get_or_add_pPr()
             for tag in ("w:pBdr", "w:numPr"):
@@ -293,7 +307,7 @@ class _Builder:
         for st in (h1, h2, h3):
             st.paragraph_format.keep_with_next = True
         self.style("Caption", 8.5, ink("600"), before=4, after=12)
-        self.style("List Bullet", 10.5, ink("900"), after=3)
+        self.style("List Bullet", 10.5, None, after=3)
         for name, size, color in (("Header", 7.5, ink("500")), ("Footer", 7.5, ink("500"))):
             self.style(name, size, color, after=0)
         self.style("Byline", 9, ink("500"), after=14)
@@ -301,8 +315,8 @@ class _Builder:
         self.style("Date line", 9.5, ink("600"), before=18)
         self.style("Sender", 8, ink("600"), after=0)
         self.style("Memo label", 9, _hex("signal", "500"), f["medium"], after=0)
-        self.style("List Number", 10.5, ink("900"), after=3)
-        self.style("List Number 2", 10.5, ink("900"), after=3)
+        self.style("List Number", 10.5, None, after=3)
+        self.style("List Number 2", 10.5, None, after=3)
         note = self.style("Note", 10, ink("700"), before=6, after=8)
         self.border(note.element.get_or_add_pPr(), "left", _hex("signal", "500"), 18, space=8)
         note.paragraph_format.left_indent = self.Cm(0.4)
@@ -323,7 +337,8 @@ class _Builder:
             self.leader_tab(st)
         self.tracking(self.doc.styles["Memo label"].element.get_or_add_rPr(), 2)
         c = WD_STYLE_TYPE.CHARACTER
-        self.style("Hyperlink", color=_hex("signal", "500"), kind=c)
+        for name, slot in (("Hyperlink", "hlink"), ("FollowedHyperlink", "folHlink")):
+            self.style(name, color=theme_colours()[slot], kind=c).font.underline = True
         self.style("Key word", color=_hex("magma", "600"), face=f["medium"], kind=c)
         self.numbering()
         self.link(h1, HEADING_NUM, 0)
@@ -536,6 +551,37 @@ class _Builder:
         if template:
             self.doc.part._content_type = TEMPLATE_CT
         self.doc.save(str(out))
+
+
+def theme_colours():
+    """Return the theme colours of the Word templates.
+
+    Accent 1 is magma and accent 2 signal, the order of the slide theme, but at
+    the paper steps; the figure palette puts signal first.
+
+    Returns
+    -------
+    dict
+        Theme slot to 6-digit hex without ``#``: ``dk1`` ink-900, ``lt1`` white,
+        ``dk2`` ink-700, ``lt2`` ink-50, ``accent1`` to ``accent6`` the paper
+        palette magma, signal, fern, ochre, iris and garnet, ``hlink`` signal-500
+        and ``folHlink`` iris.
+    """
+    paper = {name: hexv.lstrip("#") for name, hexv in palette("paper")}
+    return {
+        "dk1": _hex("ink", "900"),
+        "lt1": "FFFFFF",
+        "dk2": _hex("ink", "700"),
+        "lt2": _hex("ink", "50"),
+        "accent1": paper["magma"],
+        "accent2": paper["signal"],
+        "accent3": paper["fern"],
+        "accent4": paper["ochre"],
+        "accent5": paper["iris"],
+        "accent6": paper["garnet"],
+        "hlink": _hex("signal", "500"),
+        "folHlink": paper["iris"],
+    }
 
 
 def rpr_successors(tag):
