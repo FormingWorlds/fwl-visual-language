@@ -315,7 +315,8 @@ class _Measure:
 
     def lines(self, text, face, size, width):
         """Return the number of lines ``text`` takes at ``size`` in a column ``width`` wide."""
-        font, scale = self.fonts[face], size / 200
+        # PowerPoint breaks a line a little before the advance widths fill it
+        font, scale, width = self.fonts[face], size / 200, width * 0.96
         count, line = 1, ""
         for word in text.split():
             trial = f"{line} {word}".strip()

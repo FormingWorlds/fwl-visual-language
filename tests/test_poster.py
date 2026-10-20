@@ -368,3 +368,11 @@ def test_pptx_type_sizes_and_line_pitch_follow_the_design_units(pptx, tmp_path, 
     assert sizes[statement][0] == pytest.approx(stmt_u * to_pt, abs=0.06)
     assert sizes[statement][1] == pytest.approx(stmt_u * to_pt * 1.12, abs=0.06)
     assert sizes[poster.EXAMPLE["messages"][0][1]][0] == pytest.approx(ref_u * to_pt, abs=0.06)
+
+
+def test_the_measure_breaks_a_line_before_the_advance_widths_fill_it():
+    m = poster._Measure()
+    text = "Magma ocean worlds open a window into rocky planet interiors"
+    full = m.fonts["Light"].getlength(text) * 40 / 200
+    assert m.lines(text, "Light", 40, full * 1.05) == 1
+    assert m.lines(text, "Light", 40, full * 1.01) == 2  # PowerPoint wraps it there
