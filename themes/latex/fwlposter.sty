@@ -57,47 +57,76 @@
 
 % Text set in a \parbox: a TikZ node with "text width" drops the spaces of text above 30 pt.
 \newcommand{\fwl@text}[2]{\parbox[t]{\fwl@u{#1}}{\raggedright #2}}
+% Height of a box register in design units, and a test that it exceeds a limit.
+\newcommand{\fwl@height}[1]{\fpeval{(\the\ht#1+\the\dp#1)/2.84528*\fwl@B/\fwl@W}}
+\newcommand{\fwl@check}[3]{\ifnum\fpeval{\fwl@height{#1}>#2}=1
+  \PackageError{fwlposter}{#3}{Shorten the text; the layout keeps its sizes.}\fi}
 
-% A figure fitted into a box (x, y top-left, width, height in design units),
-% on a white panel on the dark ground, with its reference under it.
+% A figure fitted into a box (x, y top-left, width, height in design units), on a
+% white panel on the dark ground, with the reference box \fwl@rb#6 under it.
 \newcommand{\fwl@figure}[6]{%
   \node[anchor=center,inner sep=\fwl@u{\fwl@pad},fill=\fwl@panel,rounded corners=\fwl@u{8}]
     at (\fwl@u{#1+#3/2},-\fwl@u{#2+#4/2})
-    {\includegraphics[width=\fwl@u{#3-16},height=\fwl@u{#4-16},keepaspectratio]{#5}};
-  \node[anchor=north west,inner sep=0pt,text=fwlPosterMuted] at (\fwl@u{#1},-\fwl@u{#2+#4+6})
-    {\fwl@text{#3}{\fwl@fs{\fwl@ref}#6}};}
+    {\includegraphics[width=\fwl@u{#3-2*\fwl@pad},height=\fwl@u{#4-2*\fwl@pad},
+      keepaspectratio]{#5}};
+  \node[anchor=north west,inner sep=0pt] at (\fwl@u{#1},-\fwl@u{#2+#4+6})
+    {\usebox{\csname fwl@rb#6\endcsname}};}
 
-% Statements are set before the picture, where TikZ has no font; their heights go
-% into \fwl@sh1 to \fwl@sh3 in design units.
+% Everything is set before the picture, where TikZ has no font, and measured: a
+% statement may grow at the cost of its figures; the title block, a reference or the
+% contact line that does not fit its space stops the run with an error.
+\newsavebox{\fwl@hb}\newsavebox{\fwl@cb}
+\@for\fwl@k:={1a,1b,2a,2b,3a,3b}\do{\expandafter\newsavebox\csname fwl@rb\fwl@k\endcsname}
 \expandafter\newsavebox\csname fwl@sb1\endcsname
 \expandafter\newsavebox\csname fwl@sb2\endcsname
 \expandafter\newsavebox\csname fwl@sb3\endcsname
 \newcommand{\fwl@measure}[1]{%
   \expandafter\sbox\csname fwl@sb#1\endcsname{\fwl@text{\fwl@sw}{\fwlmedium
     \fwl@fs[1.12]{\fwl@stmt}\color{fwlPosterText}\csname fwl@m#1\endcsname}}%
-  \expandafter\xdef\csname fwl@sh#1\endcsname{\fpeval{max((\the\ht\csname fwl@sb#1\endcsname
-    +\the\dp\csname fwl@sb#1\endcsname)/2.84528*\fwl@B/\fwl@W,\fwl@stmt*1.8)}}}
+  \expandafter\xdef\csname fwl@sh#1\endcsname{\fpeval{max(\fwl@height{\csname fwl@sb#1\endcsname},
+    \fwl@stmt*1.8)}}%
+  \fwl@reference{#1}{a}\fwl@reference{#1}{b}}
+\newcommand{\fwl@reference}[2]{%
+  \expandafter\sbox\csname fwl@rb#1#2\endcsname{\fwl@text{\fwl@rw}{\fwl@fs{\fwl@ref}%
+    \color{fwlPosterMuted}\csname fwl@r#2#1\endcsname}}%
+  \expandafter\fwl@check\csname fwl@rb#1#2\endcsname{\fwl@rh}%
+    {The reference #2 of message #1 is longer than the space under its figure}}
 
 \newcommand{\makeposter}{%
   \ifnum\fwl@messages=3\else\PackageError{fwlposter}{A poster needs 3 \string\postermessage}{}\fi
   \edef\fwl@colw{\fpeval{(\fwl@B-80-2*34)/3}}%
-  \edef\fwl@sw{\fpeval{\ifx\fwl@layout\fwl@rowsname \fwl@B-80\else\fwl@colw\fi-\fwl@stmt*1.6}}%
+  \ifx\fwl@layout\fwl@rowsname
+    \edef\fwl@sw{\fpeval{\fwl@B-80-\fwl@stmt*1.6}}\edef\fwl@rw{\fpeval{(\fwl@B-80-24)/2}}%
+    \edef\fwl@rh{\fpeval{\fwl@ref*3.6-20}}%
+  \else
+    \edef\fwl@sw{\fpeval{\fwl@colw-\fwl@stmt*1.6}}\edef\fwl@rw{\fwl@colw}%
+    \edef\fwl@rh{\fpeval{\fwl@ref*2.4-10}}%
+  \fi
   \fwl@measure{1}\fwl@measure{2}\fwl@measure{3}%
+  \sbox{\fwl@hb}{\fwl@text{\fwl@B*0.74-40}{%
+    {\fwllightface\fwl@fs[1.08]{\fwl@titlesize}\color{fwlPosterText}\fwl@title\par}%
+    \vspace{\fwl@u{12}}%
+    {\fwlmedium\fwl@fs{\fwl@titlesize*0.44}\color{fwlPosterText}\fwl@authors\par}%
+    \vspace{\fwl@u{4}}%
+    {\fwl@fs{\fwl@titlesize*0.36}\color{fwlPosterMuted}\fwl@affiliation\par}}}%
+  \fwl@check{\fwl@hb}{\fwl@head*0.85-12}{The title, authors and affiliation are taller
+    than the header}%
+  \sbox{\fwl@cb}{\fwl@text{\fwl@B-80}{\fwl@fs{\fwl@ref*1.15}\color{fwlPosterMuted}\fwl@contact}}%
+  \fwl@check{\fwl@cb}{\fwl@ref*1.15*1.5}{The contact line is longer than 1 line}%
   \begin{tikzpicture}[remember picture,overlay,shift={(current page.north west)}]
   \fill[fwlPosterHead] (0,0) rectangle (\paperwidth,-\fwl@u{\fwl@head});
   \fill[fwlPosterRule] (0,-\fwl@u{\fwl@head-6}) rectangle (\paperwidth,-\fwl@u{\fwl@head});
   \node[anchor=north east,inner sep=0pt] at (\fwl@u{\fwl@B-40},-\fwl@u{\fwl@head*0.2})
     {\includegraphics[height=\fwl@u{\fwl@head*0.36}]{\fwlassetpath\fwl@logo}};
-  \node[anchor=north west,inner sep=0pt,text=fwlPosterText] at (\fwl@u{40},-\fwl@u{\fwl@head*0.15})
-    {\fwl@text{\fwl@B*0.74-40}{%
-    {\fwllightface\fwl@fs[1.08]{\fwl@titlesize}\fwl@title\par}\vspace{\fwl@u{12}}%
-    {\fwlmedium\fwl@fs{\fwl@titlesize*0.44}\fwl@authors\par}\vspace{\fwl@u{4}}%
-    {\color{fwlPosterMuted}\fwl@fs{\fwl@titlesize*0.36}\fwl@affiliation\par}}};
+  \node[anchor=north west,inner sep=0pt] at (\fwl@u{40},-\fwl@u{\fwl@head*0.15}) {\usebox{\fwl@hb}};
   \csname fwl@layout@\fwl@layout\endcsname
-  \node[anchor=south west,inner sep=0pt,text=fwlPosterMuted]
-    at (\fwl@u{40},-\fwl@u{\fwl@H/\fwl@W*\fwl@B-24}) {\fwl@fs{\fwl@ref*1.15}\fwl@contact};
+  \node[anchor=north west,inner sep=0pt]
+    at (\fwl@u{40},-\fwl@u{\fwl@H/\fwl@W*\fwl@B-24-\fwl@ref*1.32}) {\usebox{\fwl@cb}};
   \end{tikzpicture}\null}
 \def\fwl@rowsname{rows}
+% Figures below this height in design units mean a statement took their room.
+\newcommand{\fwl@minfig}[2]{\ifnum\fpeval{#1<#2}=1 \PackageError{fwlposter}{The statement of
+  message \i\space leaves too little room for its figures}{Shorten the statement.}\fi}
 
 % The number and the statement of message #1 at x = #2, y = \fwl@y.
 \newcommand{\fwl@statement}[2]{%
@@ -114,12 +143,11 @@
   \foreach \i in {1,2,3}{%
     \edef\fwl@y{\fpeval{\fwl@head+36+(\i-1)*\fwl@sec}}%
     \fwl@statement{\i}{40}%
-    \edef\fwl@fy{\fpeval{\fwl@y+\fwl@sh+18}}%
+    \edef\fwl@fy{\fpeval{\fwl@y+\fwl@stmt*0.25+\fwl@sh+18}}%
     \edef\fwl@fh{\fpeval{\fwl@y+\fwl@sec-\fwl@ref*3.6-\fwl@fy}}%
-    \fwl@figure{40}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fa\i\endcsname}%
-      {\csname fwl@ra\i\endcsname}%
-    \fwl@figure{40+\fwl@half+24}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fb\i\endcsname}%
-      {\csname fwl@rb\i\endcsname}%
+    \fwl@minfig{\fwl@fh}{\fwl@sec*0.35}%
+    \fwl@figure{40}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fa\i\endcsname}{\i a}%
+    \fwl@figure{40+\fwl@half+24}{\fwl@fy}{\fwl@half}{\fwl@fh}{\csname fwl@fb\i\endcsname}{\i b}%
     \ifnum\i<3 \fill[fwlPosterLine] (\fwl@u{40},-\fwl@u{\fwl@y+\fwl@sec-12})
       rectangle (\fwl@u{\fwl@B-40},-\fwl@u{\fwl@y+\fwl@sec-11});\fi}}
 
@@ -129,12 +157,12 @@
   \foreach \i in {1,2,3}{%
     \edef\fwl@x{\fpeval{40+(\i-1)*(\fwl@colw+34)}}%
     \fwl@statement{\i}{\fwl@x}%
-    \edef\fwl@fy{\fpeval{\fwl@y+max(\fwl@sh,\fwl@stmt*3.4)+16}}%
+    \edef\fwl@fy{\fpeval{\fwl@y+\fwl@stmt*0.25+max(\fwl@sh,\fwl@stmt*3.4)+16}}%
     \edef\fwl@fh{\fpeval{(\fwl@bottom-\fwl@fy-2*\fwl@ref*2.4)/2}}%
-    \fwl@figure{\fwl@x}{\fwl@fy}{\fwl@colw}{\fwl@fh}{\csname fwl@fa\i\endcsname}%
-      {\csname fwl@ra\i\endcsname}%
+    \fwl@minfig{\fwl@fh}{(\fwl@bottom-\fwl@y)*0.18}%
+    \fwl@figure{\fwl@x}{\fwl@fy}{\fwl@colw}{\fwl@fh}{\csname fwl@fa\i\endcsname}{\i a}%
     \fwl@figure{\fwl@x}{\fwl@fy+\fwl@fh+\fwl@ref*2.4}{\fwl@colw}{\fwl@fh}%
-      {\csname fwl@fb\i\endcsname}{\csname fwl@rb\i\endcsname}%
+      {\csname fwl@fb\i\endcsname}{\i b}%
     \ifnum\i<3 \fill[fwlPosterLine] (\fwl@u{\fwl@x+\fwl@colw+16},-\fwl@u{\fwl@y})
       rectangle (\fwl@u{\fwl@x+\fwl@colw+17},-\fwl@u{\fwl@bottom});\fi}}
 \endinput

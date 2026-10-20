@@ -77,7 +77,7 @@ python -m fwl_visual_language.poster path/to/poster          # LaTeX style, font
 python -m fwl_visual_language.poster --pptx templates         # PowerPoint posters
 ```
 
-A poster carries a header with the title, the authors, the affiliation and the lab logo, then 3 numbered messages, each a statement with 2 figures and their references, and a contact line at the foot. The LaTeX style takes the format and the look as options, `\usepackage[a0portrait,dark]{fwlposter}`: `a0portrait`, `a0landscape`, `a4` (a one-pager) or `slide` (16:9, for e-poster screens), and `dark` (the ink ground, figures on white panels) or `light` (white). Portrait formats stack the messages, landscape formats set them side by side. Compile with LuaLaTeX:
+A poster carries a header with the title, the authors, the affiliation and the lab logo, then 3 numbered messages, each a statement with 2 figures and their references, and a contact line at the foot. The LaTeX style takes the format and the look as options, `\usepackage[a0portrait,dark]{fwlposter}`: `a0portrait`, `a0landscape`, `a4` (a one-pager) or `slide` (16:9, for e-poster screens), and `dark` (the ink ground, figures on white panels) or `light` (white). Portrait formats stack the messages, landscape formats set them side by side. Put your 6 figures next to the poster and compile twice with LuaLaTeX; the page picture takes its place from the first run:
 
 ```latex
 \documentclass{article}
@@ -92,7 +92,7 @@ A poster carries a header with the title, the authors, the affiliation and the l
 \begin{document}\makeposter\end{document}
 ```
 
-`templates/` holds the PowerPoint posters, one file per format with a dark and a light slide; edit the slide of your look, delete the other, and replace each placeholder figure with your own.
+A statement may push its figures down. A title block, a reference or a contact line that does not fit its space stops the run with an error that names it, so a poster never goes out with text over a figure; the PowerPoint builder applies the same rules. `templates/` holds the PowerPoint posters, one file per format with a dark and a light slide; edit the slide of your look, delete the other, and replace each placeholder figure with your own.
 
 ## Social media
 

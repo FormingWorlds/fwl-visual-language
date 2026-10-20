@@ -79,8 +79,10 @@ jobs:
             tests/test_build_latex.py::test_greek_and_bold_math_in_headings_reach_the_bookmarks \
             tests/test_poster.py::test_each_format_compiles_to_its_page_size_with_every_text \
             tests/test_poster.py::test_a_poster_needs_exactly_3_messages \
-            tests/test_poster.py::test_the_dark_page_is_ink_and_the_light_page_white \
+            tests/test_poster.py::test_the_ground_header_and_rule_have_the_look_colours \
+            tests/test_poster.py::test_text_that_does_not_fit_stops_the_run \
+            tests/test_poster.py::test_a_longer_statement_pushes_its_figures_down_without_overlap \
             tests/test_beamer.py::test_talk_compiles_with_references_in_both_corners \
             tests/test_beamer.py::test_talk_embeds_the_lab_fonts | tee out.txt
-          grep -qE "(^|[^0-9])18 passed" out.txt
+          grep -qE "(^|[^0-9])26 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi
