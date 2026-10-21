@@ -80,7 +80,7 @@
   {\large\fwlmedium\color{fwlHeading}\@author\par}{\color{fwlMuted}\fwl@snum\par}\vspace{1.6em}
   {\color{fwlMuted}\small\begin{tabular}{@{}l@{\hspace{1.2em}}l@{}}\fwl@sup\end{tabular}\par}
   \vfill
-  \begin{minipage}[b]{4cm}\includegraphics[width=3.4cm]{\fwlassetpath fwl-logo-ink.png}\par
+  \begin{minipage}[b]{5cm}\includegraphics[width=3.4cm]{\fwlassetpath fwl-logo-ink.png}\par
     \vspace{0.35em}{\ttfamily\small\color{fwlMuted}formingworlds.space}\end{minipage}\hfill
   {\color{fwlMuted}\small Groningen, \@date}\par
 \end{titlepage}}

@@ -265,6 +265,8 @@ def test_the_theme_build_holds_the_class():
 EXTRA_BIB = (
     "@ARTICLE{Test2020, author = {{Test}, Ann}, title = {A test entry},"
     " journal = {\\apj}, year = 2020}\n"
+    "@ARTICLE{Test2021, author = {{Test}, Ann and {Other}, Bo}, title = {A second test},"
+    " journal = {\\aj}, year = 2021}\n"
 )
 TABLE = (
     "\\begin{table}[h]\\caption{Parameters.}\\centering"
@@ -286,7 +288,8 @@ def compiled(tmp_path_factory):
         ("% \\listoffigures\n", "\\listoffigures\n\\listoftables\n"),
         ("Figure~\\ref{fig:cooling} shows", TABLE + "Figure~\\ref{fig:cooling} shows"),
         ("The surface radiates", "\\subsection{Model}\nThe surface radiates"),
-        ("\\bibliography{references}", "\\nocite{Test2020}\\bibliography{references,extra}"),
+        ("\\bibliography{references}", "\\bibliography{references,extra}"),
+        ("How long the mantle", "\\citet{Test2020} and \\citet{Test2021}. How long the mantle"),
     ):
         assert final.count(old) == 1, old
         final = final.replace(old, new)
@@ -319,6 +322,8 @@ def pages(folder, name):
 
 def heading(page):
     lines = [re.sub(r"\s+", " ", ln).strip() for ln in page.splitlines() if ln.strip()]
+    if len(lines) < 3:
+        return ""
     first = lines[1]  # line 0 is the running head
     numbered = first.isdigit() or re.fullmatch("[A-Z]", first)  # 1 Introduction, A Extra
     return f"{first} {lines[2]}" if numbered else first
@@ -358,7 +363,9 @@ def test_the_example_compiles_with_each_section_on_its_own_page(compiled):
         "Using this template",
         *SECTIONS,
     ]
-    assert len(draft) == page_count(folder, "main")  # the tips may fill 2 pages, none is blank
+    tips = sum(head(p).endswith("Using this template") for p in draft)
+    assert tips in (1, 2)  # the tips fill 1 or 2 pages; no section runs over its page here
+    assert page_count(folder, "main") == len(draft) == 1 + tips + len(SECTIONS)
     assert [heading(p) for p in final[1:]] == FINAL
     # no page is blank: every page of the PDF holds one of these headings
     assert page_count(folder, "final") == len(FINAL) + 1
@@ -459,6 +466,7 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
         assert cite in text, cite
     final = re.sub(r"\s+", " ", " ".join(pages(folder, "final")))
     assert "Test, A. 2020, ApJ" in final  # an ADS journal macro in the .bib
+    assert "Test (2020) and Test & Other (2021)" in final  # 1 and 2 authors
     fonts = subprocess.run(["pdffonts", "main.pdf"], cwd=folder, capture_output=True, text=True)
     names = {ln.split()[0].split("+")[-1] for ln in fonts.stdout.splitlines()[2:]}
     assert names == {
