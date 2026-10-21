@@ -277,6 +277,30 @@ def test_a_missing_python_docx_names_the_extra(tmp_path, monkeypatch):
         word.build_word(tmp_path)
 
 
+def test_the_command_line_takes_face_all_for_both_faces(tmp_path):
+    word.main([str(tmp_path / "all"), "--face", "all", "--docx"])
+    names = sorted(p.name for p in (tmp_path / "all").iterdir())
+    assert names == sorted(
+        f"{word.template_name(k, f)}.docx" for f in word.FACES for k in word.KINDS
+    )
+
+
+def test_the_word_university_letter_footer_runs_logo_tab_number(built):
+    feet = footers(built["university-letter", "geist"])
+    assert len(feet) == 2
+    for f in feet:
+        (p,) = f.findall("w:p", NS)
+        kinds = []
+        for c in p:
+            if c.tag == f"{W}fldSimple":
+                kinds.append("page")
+            elif c.tag == f"{W}r" and c.find(".//{*}blip") is not None:
+                kinds.append("logo")
+            elif c.tag == f"{W}r" and c.find("w:tab", NS) is not None:
+                kinds.append("tab")
+        assert kinds == ["logo", "tab", "page"]
+
+
 def test_command_line_and_module_run(tmp_path, capsys, monkeypatch):
     word.main([str(tmp_path / "cli"), "--face", "aptos", "--docx"])
     out = capsys.readouterr().out.split("\n")
@@ -687,3 +711,223 @@ def test_white_header_text_on_the_accents_meets_the_readme_contrast():
         assert contrast("FFFFFF", colours[slot]) >= 4.5, slot
     for slot in ("accent3", "accent4"):
         assert 3.0 <= contrast("FFFFFF", colours[slot]) < 4.5, slot
+
+
+@pytest.fixture(scope="module")
+def gdocs(tmp_path_factory):
+    d = tmp_path_factory.mktemp("gdocs")
+    written = word.build_gdocs(d)
+    assert [p.name for p in written] == [f"{word.gdocs_name(k)}.docx" for k in word.KINDS]
+    return dict(zip(word.KINDS, written, strict=True))
+
+
+def footers(path):
+    with zipfile.ZipFile(path) as z:
+        return [
+            etree.fromstring(z.read(n))
+            for n in sorted(z.namelist())
+            if re.fullmatch(r"word/footer\d+\.xml", n)
+        ]
+
+
+def test_google_docs_files_are_geist_documents_with_the_lab_name(gdocs):
+    assert word.gdocs_name("university-letter") == "Forming Worlds University Letter (Google Docs)"
+    for path in gdocs.values():
+        types = part(path, "[Content_Types].xml")
+        doc = [o for o in types if o.get("PartName") == "/word/document.xml"]
+        assert doc[0].get("ContentType").endswith("document.main+xml"), path.name
+        defaults = part(path, "word/styles.xml").find("w:docDefaults/w:rPrDefault", NS)
+        assert set(fonts(defaults).values()) == {"Geist"}, path.name
+
+
+def test_google_docs_headings_have_no_numbers_and_heading_1_is_signal_blue(gdocs, built):
+    for kind, path in gdocs.items():
+        h1, h2 = style(path, "Heading1"), style(path, "Heading2")
+        assert h1.find(".//w:numPr", NS) is None and h2.find(".//w:numPr", NS) is None, kind
+        assert val(h1, "color") == "0072A1", kind
+        assert val(h2, "color") == "010305", kind
+        for sid, (num, lvl) in {
+            "ListBullet": ("91", "0"),
+            "ListNumber": ("92", "0"),
+            "ListNumber2": ("92", "1"),
+        }.items():
+            numpr = style(path, sid).find(".//w:numPr", NS)
+            assert (val(numpr, "numId"), val(numpr, "ilvl")) == (num, lvl), (kind, sid)
+        numbering = part(path, "word/numbering.xml")
+        ids = {a.get(f"{W}abstractNumId") for a in numbering.findall("w:abstractNum", NS)}
+        nums = {n.get(f"{W}numId") for n in numbering.findall("w:num", NS)}
+        assert {"91", "92"} <= ids and "90" not in ids and "90" not in nums, kind
+        links = {
+            n.get(f"{W}numId"): val(n, "abstractNumId") for n in numbering.findall("w:num", NS)
+        }
+        assert (links["91"], links["92"]) == ("91", "92"), kind
+    word_ids = part(built["report", "geist"], "word/numbering.xml").findall("w:abstractNum", NS)
+    assert "90" in {a.get(f"{W}abstractNumId") for a in word_ids}
+    hb = style(gdocs["handbook"], "Heading1")
+    assert (val(hb, "sz"), fonts(hb)["ascii"]) == ("40", "Geist Light")
+    assert hb.find(".//w:pageBreakBefore", NS) is not None
+    assert val(style(built["report", "geist"], "Heading1"), "color") == "010305"
+
+
+@pytest.mark.parametrize(
+    "kind, left, count",
+    [
+        ("letter", word.LAB_LINE, 2),
+        ("report", "Title of the report  ·  Forming Worlds Lab", 1),
+        ("memo", "Forming Worlds Lab  ·  internal memo", 1),
+        ("handbook", "Forming Worlds Lab  ·  Handbook", 1),
+    ],
+)
+def test_google_docs_footers_put_text_and_page_at_the_right_without_tabs(gdocs, kind, left, count):
+    filled = [f for f in footers(gdocs[kind]) if f.find(".//w:fldSimple", NS) is not None]
+    assert len(filled) == count, kind
+    for f in filled:
+        assert f.find(".//w:tab", NS) is None and f.find(".//w:tabs", NS) is None, kind
+        (p,) = f.findall("w:p", NS)
+        assert val(p.find("w:pPr", NS), "jc") == "right", kind
+        assert "".join(p.find("w:r", NS).itertext()) == left + "  ·  ", kind
+        assert p.find("w:fldSimple", NS).get(f"{W}instr") == "PAGE", kind
+
+
+def test_the_google_docs_university_letter_footer_is_a_logo_and_number_table(gdocs):
+    feet = footers(gdocs["university-letter"])
+    assert len(feet) == 2
+    for f in feet:
+        assert f.find(".//w:tab", NS) is None
+        assert [c.tag for c in f] == [f"{W}tbl", f"{W}p"]  # Word needs a paragraph at the end
+        tbl = f.find("w:tbl", NS)
+        assert tbl.find("w:tblPr/w:tblBorders/w:top", NS).get(f"{W}val") == "nil"
+        assert_fixed_halves(tbl)
+        logo, num = tbl.findall("w:tr/w:tc", NS)
+        assert logo.find(".//{*}blip") is not None and logo.find(".//w:fldSimple", NS) is None
+        assert num.find(".//w:fldSimple", NS).get(f"{W}instr") == "PAGE"
+        assert val(num.find(".//w:pPr", NS), "jc") == "right"
+        assert [val(c.find("w:tcPr", NS), "vAlign") for c in (logo, num)] == ["bottom"] * 2
+
+
+def assert_fixed_halves(tbl, first="4705", second="4706"):
+    """Assert a fixed 2-column table at the text width (9411 twips) with matching cells."""
+    tblw = tbl.find("w:tblPr/w:tblW", NS)
+    assert (tblw.get(f"{W}type"), tblw.get(f"{W}w")) == ("dxa", "9411")
+    assert tbl.find("w:tblPr/w:tblLayout", NS).get(f"{W}type") == "fixed"
+    grid = [g.get(f"{W}w") for g in tbl.findall("w:tblGrid/w:gridCol", NS)]
+    assert grid == [first, second]
+    for row in tbl.findall("w:tr", NS):
+        cells = [c.find("w:tcPr/w:tcW", NS) for c in row.findall("w:tc", NS)]
+        assert [(c.get(f"{W}type"), c.get(f"{W}w")) for c in cells] == [
+            ("dxa", first),
+            ("dxa", second),
+        ]
+
+
+def test_the_google_docs_memo_tables_have_fixed_text_width(gdocs, built):
+    tables = part(gdocs["memo"], "word/document.xml").findall(".//w:tbl", NS)
+    assert len(tables) == 2
+    assert_fixed_halves(tables[0])
+    assert_fixed_halves(tables[1], "1361", "8050")
+    body = part(gdocs["memo"], "word/document.xml").find("w:body", NS)
+    kids = list(body)
+    first = [c.tag for c in kids].index(f"{W}tbl")
+    filler = kids[first + 1]  # Google Docs joins adjacent tables
+    assert [c.tag for c in kids[first : first + 3]] == [f"{W}tbl", f"{W}p", f"{W}tbl"]
+    assert "".join(filler.itertext()) == "" and val(filler, "pStyle") == "Sender"
+    word_memo = part(built["memo", "geist"], "word/document.xml").find(".//w:tbl", NS)
+    assert word_memo.find("w:tblPr/w:tblW", NS).get(f"{W}type") == "auto"
+
+
+def test_the_google_docs_letter_header_table_has_fixed_halves(gdocs, built):
+    with zipfile.ZipFile(gdocs["letter"]) as z:
+        hdrs = [
+            etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/header\d+\.xml", n)
+        ]
+    tables = [t for h in hdrs for t in h.findall("w:tbl", NS)]
+    assert len(tables) == 1
+    assert_fixed_halves(tables[0])
+    with zipfile.ZipFile(built["letter", "geist"]) as z:
+        hdrs = [
+            etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/header\d+\.xml", n)
+        ]
+    (word_table,) = [t for h in hdrs for t in h.findall("w:tbl", NS)]
+    assert word_table.find("w:tblPr/w:tblLayout", NS) is None
+
+
+def test_the_google_docs_handbook_asks_for_google_contents_not_a_field(gdocs):
+    path = gdocs["handbook"]
+    doc = part(path, "word/document.xml")
+    assert doc.find(".//w:fldChar", NS) is None and doc.find(".//w:instrText", NS) is None
+    body = texts(path)
+    assert "Insert > Table of contents" in body and "Update Field" not in body
+    paras = list(doc.find("w:body", NS).iterfind("w:p", NS))
+    lines = ["".join(p.itertext()) for p in paras]
+    at = lines.index("Choose Insert > Table of contents to list the chapters here.")
+    assert (lines[at - 1], lines[at + 1]) == ("Contents", "Chapter")
+    assert paras[at].find("w:r/w:br", NS).get(f"{W}type") == "page"
+    for words in ("Handbook", "Contents", "Chapter", "A note that stands out", "A sub-step."):
+        assert words in body
+    assert body.index("Contents") < body.index("Chapter")
+    heads = [
+        "".join(p.itertext())
+        for p in doc.iter(f"{W}p")
+        if p.find("w:pPr/w:pStyle", NS) is not None
+        and p.find("w:pPr/w:pStyle", NS).get(f"{W}val") == "Heading1"
+    ]
+    assert heads == ["Chapter"]
+
+
+def test_google_docs_files_keep_the_schema_order_and_the_placeholders(gdocs):
+    for path in gdocs.values():
+        text = texts(path)
+        assert not re.search(r"\bTim\b|Lichtenberg|@astro|@gmail", text), path.name
+        with zipfile.ZipFile(path) as z:
+            names = [n for n in z.namelist() if re.fullmatch(r"word/[a-z0-9]+\.xml", n)]
+            roots = [etree.fromstring(z.read(n)) for n in names]
+        for root in roots:
+            for tag, order in ORDER.items():
+                for el in root.iter(f"{W}{tag}"):
+                    kids = [c.tag.split("}")[1] for c in el if c.tag.startswith(W)]
+                    pos = [order.index(k) for k in kids if k in order]
+                    assert pos == sorted(set(pos)), (path.name, tag, kids)
+
+
+def test_google_docs_refuse_unknown_kinds_and_name_the_extra(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match="unknown kind: \\['poster'\\]"):
+        word.build_gdocs(tmp_path, ["poster"])
+    assert not list(tmp_path.iterdir())
+    monkeypatch.setitem(sys.modules, "docx", None)
+    with pytest.raises(ImportError, match=r"fwl-visual-language\[word\]"):
+        word.build_gdocs(tmp_path)
+
+
+@pytest.mark.parametrize("extra", [["--face", "aptos"], ["--face", "all"], ["--docx"]])
+def test_the_command_line_refuses_face_and_docx_with_gdocs(tmp_path, capsys, extra):
+    with pytest.raises(SystemExit) as err:
+        word.main([str(tmp_path / "g"), "--gdocs", *extra])
+    assert err.value.code == 2
+    assert "takes neither --face nor --docx" in capsys.readouterr().err
+    assert not (tmp_path / "g").exists()
+
+
+def test_the_command_line_writes_the_google_docs_files(tmp_path, capsys):
+    word.main([str(tmp_path / "g"), "--gdocs"])
+    out = [line for line in capsys.readouterr().out.split("\n") if line]
+    names = sorted(f"{word.gdocs_name(k)}.docx" for k in word.KINDS)
+    assert sorted(p.name for p in (tmp_path / "g").iterdir()) == names
+    assert sorted(Path(line).name for line in out) == names
+
+
+def test_the_committed_google_docs_files_match_a_fresh_build(tmp_path):
+    folder = Path(__file__).resolve().parents[1] / "templates"
+    fresh = {p.name: p for p in word.build_gdocs(tmp_path)}
+    committed = sorted(p.name for p in folder.glob("* (Google Docs).docx"))
+    rebuild = "rebuild with: python -m fwl_visual_language.word templates --gdocs"
+    assert committed == sorted(fresh), rebuild
+    for name, path in fresh.items():
+        with zipfile.ZipFile(folder / name) as a, zipfile.ZipFile(path) as b:
+            old = {n: a.read(n) for n in a.namelist()}
+            new = {n: b.read(n) for n in b.namelist()}
+        differ = sorted(n for n in old.keys() | new.keys() if old.get(n) != new.get(n))
+        assert differ == [], f"{name}: {differ} differ; {rebuild}"
