@@ -80,13 +80,14 @@
   {\large\fwlmedium\color{fwlHeading}\@author\par}{\color{fwlMuted}\fwl@snum\par}\vspace{1.6em}
   {\color{fwlMuted}\small\begin{tabular}{@{}l@{\hspace{1.2em}}l@{}}\fwl@sup\end{tabular}\par}
   \vfill
-  \includegraphics[width=3.4cm]{\fwlassetpath fwl-logo-ink.png}\hfill
-  \raisebox{0.4cm}{\color{fwlMuted}\small Groningen, \@date}\par
+  \begin{minipage}[b]{4cm}\includegraphics[width=3.4cm]{\fwlassetpath fwl-logo-ink.png}\par
+    \vspace{0.35em}{\ttfamily\small\color{fwlMuted}formingworlds.space}\end{minipage}\hfill
+  {\color{fwlMuted}\small Groningen, \@date}\par
 \end{titlepage}}
 
 % Grey guidance; the final option hides all of it
 \newcommand{\guide}[1]{\iffwl@final\ignorespaces\else
-  \par{\small\color{fwlInk500}#1\par}\medskip\fi}
+  \par{\small\raggedright\color{fwlInk500}#1\par}\medskip\fi}
 \newcommand{\guidesection}[1]{\iffwl@final\else\section*{#1}\fi}
 \newcommand{\guidecmd}[1]{\texttt{#1}}
 % Where the data and the script of a figure are published

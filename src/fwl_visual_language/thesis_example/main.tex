@@ -17,19 +17,21 @@
 \maketitle
 
 \guidesection{Using this template}
-\guide{Grey text like this says what goes where. Write your own text below it. The class option \guidecmd{final} hides all grey text at once, so you can keep it while you write. Compile with LuaLaTeX; in Overleaf, set the compiler to LuaLaTeX in the project settings. Replace the example sentences, the equation, Figure 1 with its data, script and link, and the example reference with your own, and delete what you do not use. The tips below cite the example reference: delete this page of tips when you delete the reference.}
-\guide{\textbf{Citations.} \guidecmd{\textbackslash citet\{key\}} cites in the sentence: \citet{Lichtenberg2021} show that \ldots; \guidecmd{\textbackslash citep\{key\}} cites in parentheses: \ldots{} \citep{Lichtenberg2021}. Take the BibTeX entry of each paper from NASA ADS (Export, BibTeX) and cite it with the key of its entry. Cite the journal version once a paper is published, not only the arXiv version. The common journal macros of ADS, such as \guidecmd{\textbackslash apj} and \guidecmd{\textbackslash mnras}, are defined; where LaTeX reports one as undefined, write the journal name in the entry.}
-\guide{\textbf{Code and data.} All code and data of the thesis must be public. Put the code, the data, one plotting script per figure and a licence file in a GitHub repository. Make the repository public. On zenodo.org, log in with GitHub, open the GitHub page of your account and switch the repository on; then publish a release on GitHub: Zenodo archives it and gives each release its own DOI. Cite the DOI of the release you used. Every figure must be replottable from these files: name its data and script in the caption with \guidecmd{\textbackslash figuredata\{link\}}, as in Figure~\ref{fig:cooling}, which \guidecmd{scripts/plot\_cooling.py} plots from \guidecmd{data/cooling.csv}; replace the example link with the DOI of your release. Cite the codes and data sets of others that you use, in the form their documentation asks for.}
+\guide{This template gives you a reasonable starting point for a thesis in the Forming Worlds Lab. You can change it as you wish, use another template or start from scratch; we encourage you to use it and to change it only a little.}
+\guide{Grey text like this says what goes where. Write your own text below it. The class option \guidecmd{final} hides all grey text at once, so you can keep it while you write. Compile with LuaLaTeX; in Overleaf, set the compiler to LuaLaTeX in the project settings. Replace the example sentences, the equation, Figure 1 with its data, script and link, and the example references with your own, and delete what you do not use. The tips below cite the example references: delete this page of tips when you delete them.}
+\guide{\textbf{Citations.} \guidecmd{\textbackslash citet\{key\}} cites in the sentence: \citet{Lichtenberg2021} show that \ldots; \guidecmd{\textbackslash citep\{key\}} cites in parentheses: \ldots{} \citep{Lichtenberg2021}. A paper by 1 author appears as Surname (2021), by 2 authors as Surname \& Surname (2021), by 3 or more as Surname et al. (2021). Cite several papers in one bracket with a comma between the keys: \guidecmd{\textbackslash citep\{Lichtenberg2021,Nicholls2024\}} gives \citep{Lichtenberg2021,Nicholls2024}. The 2 optional arguments add a comment before and after the citation: \guidecmd{\textbackslash citep[e.g.,][]\{key\}} gives \citep[e.g.,][]{Nicholls2024}, \guidecmd{\textbackslash citep[see][Fig.\textasciitilde 3]\{key\}} gives \citep[see][Fig.~3]{Lichtenberg2021}, and \guidecmd{\textbackslash citep[][Sect.\textasciitilde 2]\{key\}} gives \citep[][Sect.~2]{Nicholls2024}. Take the BibTeX entry of each paper from NASA ADS (Export, BibTeX) and cite it with the key of its entry. Cite the journal version once a paper is published, not only the arXiv version. The common journal macros of ADS, such as \guidecmd{\textbackslash apj} and \guidecmd{\textbackslash mnras}, are defined; where LaTeX reports one as undefined, write the journal name in the entry.}
+\guide{\textbf{Code and data.} All code and data of the thesis must be public, so that anyone can reproduce the results; the version you submit must be public on Zenodo. Put the code, the data, one plotting script per figure and a licence file in a GitHub repository, and make the repository public. On zenodo.org, log in with GitHub, open the GitHub page of your account and switch the repository on; then publish a release on GitHub, and Zenodo archives it. Zenodo gives each release its own DOI, and the record one more DOI for all versions, which always leads to the newest version. Cite that DOI for all versions. When you change the code or the data, publish a new release: Zenodo adds it to the same record as a new version. Every figure must be replottable from these files: name its data and script in the caption with \guidecmd{\textbackslash figuredata\{link\}}, as in Figure~\ref{fig:cooling}, which \guidecmd{scripts/plot\_cooling.py} plots from \guidecmd{data/cooling.csv}; replace the example link with the DOI of your record. Cite the codes and data sets of others that you use, in the form their documentation asks for.}
 \guide{\textbf{Figures and units.} Plot with the lab style fwl-mpl (the top of \guidecmd{scripts/plot\_cooling.py} gives the install command), save figures as vector PDF, label every axis with its quantity and unit, and use the colours of the style, which stay apart for readers with colour-vision deficiency. A caption starts with what the figure shows and says how to read it: what one line, dot or colour is, and where to look. Write numbers with units as \guidecmd{\textbackslash qty\{3000\}\{\textbackslash kelvin\}}. For a list of figures, remove the \guidecmd{\%} before \guidecmd{\textbackslash listoffigures} below the contents; it takes the short form of a caption, \guidecmd{\textbackslash caption[short]\{long\}}, so the data link stays out of it.}
-\guide{\textbf{Writing.} Give each paragraph one message, stated in its first sentence. Use the present tense for what the thesis shows and the past tense for what you did. Define every symbol where it first appears. Agree on the plan and the length of each section with your supervisor before you write.}
+\guide{\textbf{Writing.} Give each paragraph one message, stated in its first sentence. Define every symbol where it first appears. On average, the sections take these tenses: the Introduction the present tense for what is known and the past tense for what an earlier study did; the Methods the past tense for what you did and the present tense for the equations of a model; the Results the past tense for what you found and the present tense for what a figure shows (Figure~1 shows \ldots); the Discussion and the Conclusions the present tense.}
+\guide{\textbf{Length.} A thesis has no minimum length: its content and scientific quality count, and its length also depends on how many figures it has. As a guide, typical theses have about these pages of text, figures not counted: for a BSc thesis Introduction 3, Methods 3, Results 4, Discussion 3 and Conclusions 1; for an MSc thesis Introduction 5, Methods 5, Results 8, Discussion 5 and Conclusions 1 to 2. Agree on the plan of the thesis with your supervisor before you write.}
 
 \section*{Abstract}
-\guide{A few sentences in each of the 5 labelled parts. Write it last.}
-\textbf{Context.} \guide{The problem and why it matters.}
-\textbf{Aims.} \guide{The question this thesis answers.}
-\textbf{Methods.} \guide{The data, models and codes you used.}
-\textbf{Results.} \guide{The main results, as numbers with uncertainties.}
-\textbf{Conclusions.} \guide{What follows from the results.}
+\guide{Write the abstract last, with at most the number of sentences given for each part.}
+\textbf{Context.} \guide{The problem and why it matters; at most 2 sentences.}
+\textbf{Aims.} \guide{The question this thesis answers; at most 2 sentences.}
+\textbf{Methods.} \guide{The data, models and codes you used; at most 3 sentences.}
+\textbf{Results.} \guide{The main results, as numbers with uncertainties; at most 4 sentences.}
+\textbf{Conclusions.} \guide{What follows from the results; at most 2 sentences.}
 
 \section*{Samenvatting}
 \guide{The abstract in Dutch, with the same 5 parts: Context, Doel, Methode, Resultaten, Conclusies.}
@@ -39,12 +41,12 @@
 
 \section{Introduction}
 \label{sec:introduction}
-\guide{Start with the scientific context and the open question, with citations to the key papers. Narrow down to the problem of this thesis, state its aim in 1 or 2 sentences, and end with an outline of the next sections.}
+\guide{Start with the scientific context and the open question, with citations to the key papers. Narrow down to the problem of this thesis, state its aim in 1 or 2 sentences, and end with an outline of the next sections. Typical length: about 3 pages for a BSc thesis, 5 for an MSc thesis.}
 How long the mantle of a young rocky planet stays molten depends on the atmosphere above it \citep{Lichtenberg2021}.
 
 \section{Methods}
 \label{sec:methods}
-\guide{Describe the models, data and codes in enough detail that a reader can reproduce the results: equations with every symbol and unit defined, parameter values (a table helps), and the version of each code. Cite every code and data set you use.}
+\guide{Describe the models, data and codes in enough detail that a reader can reproduce the results: equations with every symbol and unit defined, parameter values (a table helps), and the version of each code. Cite every code and data set you use. Typical length: about 3 pages for a BSc thesis, 5 for an MSc thesis.}
 The surface radiates as a grey body,
 \begin{equation}
 F = \varepsilon\,\sigma T_\mathrm{s}^4 ,
@@ -54,7 +56,7 @@ with $F$ the emitted flux per unit area, $\varepsilon$ the emissivity, $\sigma$ 
 
 \section{Results}
 \label{sec:results}
-\guide{Present the results in the order of your aims, before you interpret them. Refer to every figure in the text. Give numbers with uncertainties and units.}
+\guide{The Results say what you found, and the Discussion says what it means. Present the results in the order of your aims: what you measured or computed, as numbers with uncertainties and units, and the trends that your figures show. Refer to every figure in the text and describe what the reader sees in it. Keep interpretation for the Discussion: a sentence that your figures or tables can confirm on their own belongs here; a sentence that needs more reasoning (why, compared with what, what if) belongs in the Discussion. Typical length: about 4 pages for a BSc thesis, 8 for an MSc thesis.}
 Figure~\ref{fig:cooling} shows the surface temperature of 3 cases.
 \begin{figure}[ht]
   \centering
@@ -66,21 +68,23 @@ Figure~\ref{fig:cooling} shows the surface temperature of 3 cases.
 
 \section{Discussion}
 \label{sec:discussion}
-\guide{Interpret the results: what they mean, how they compare with earlier work, which assumptions and limits matter most, and what the next step would be.}
+\guide{Interpret the results. Explain the physics behind each main result, and compare it with earlier work, with observations where they exist, and with your expectations. Say which assumptions and limits of the method matter most and how they could change the results. End with what the results mean for the field and which questions remain open. Each point of the Discussion builds on a result: it does not repeat the result, it explains it. Typical length: about 3 pages for a BSc thesis, 5 for an MSc thesis.}
 
 \section{Conclusions}
 \label{sec:conclusions}
-\guide{The main findings, each in 1 or 2 sentences, so that a reader of this section alone knows what the thesis shows.}
+\guide{Summarise the thesis so that a reader of this section alone knows what it shows: the question, the main findings with their key numbers, what they mean, and the next steps. A short numbered list of results, each with a few sentences, works well. Typical length: about 1 page for a BSc thesis, 1 to 2 for an MSc thesis.}
 
 \section*{Data and code availability}
-\guide{Required. Give the GitHub repository with the release you used and the Zenodo record with its DOI, and say which script makes which figure.}
+\guide{Required. Give the GitHub repository and the DOI for all versions of its Zenodo record, and say which script makes which figure.}
 
 \section*{Acknowledgments}
-\guide{Thank your supervisors and the people who helped. Name the computing facilities and any funding.}
+\guide{Thank the people who helped with the work and the thesis. Name the computing facilities, the data and software you used, and any funding.}
 
 \bibliography{references}
 
-% \appendix
-% \section{Appendix title}
+\appendix
+\section{Additional material}
+\label{sec:appendix}
+\guide{Optional. An appendix holds material that supports the thesis but would interrupt the main text: derivations, extra figures and tables, lists of parameters, and tests of the method, such as checks of resolution or convergence. Refer to each appendix from the main text. Add one section for each topic, and delete this one if you do not need an appendix.}
 
 \end{document}

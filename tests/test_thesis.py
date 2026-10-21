@@ -17,7 +17,7 @@ from fwl_visual_language import assets_dir, thesis
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 EXAMPLE = Path(thesis.__file__).resolve().parent / "thesis_example"
 TEX = all(shutil.which(t) for t in ("lualatex", "bibtex", "pdffonts", "pdftotext", "pdfinfo"))
-GUIDE = ("Using this template", "Write it last", "Required. Give the GitHub repository")
+GUIDE = ("Using this template", "Write the abstract last", "Required. Give the GitHub repository")
 SECTIONS = [
     "Abstract",
     "Samenvatting",
@@ -30,6 +30,7 @@ SECTIONS = [
     "Data and code availability",
     "Acknowledgments",
     "References",
+    "A Additional material",
 ]
 
 
@@ -286,7 +287,6 @@ def compiled(tmp_path_factory):
         ("Figure~\\ref{fig:cooling} shows", TABLE + "Figure~\\ref{fig:cooling} shows"),
         ("The surface radiates", "\\subsection{Model}\nThe surface radiates"),
         ("\\bibliography{references}", "\\nocite{Test2020}\\bibliography{references,extra}"),
-        ("% \\appendix\n% \\section{Appendix title}", "\\appendix\n\\section{Extra}\nText."),
     ):
         assert final.count(old) == 1, old
         final = final.replace(old, new)
@@ -338,7 +338,7 @@ FINAL = [
     "Data and code availability",
     "Acknowledgments",
     "References",
-    "A Extra",
+    "A Additional material",
 ]
 LOG_FAULTS = r"^!|Overfull|undefined|Missing character|Package fancyhdr Warning"
 
@@ -353,12 +353,17 @@ def test_the_example_compiles_with_each_section_on_its_own_page(compiled):
     for name, log in logs.items():
         assert not re.search(LOG_FAULTS, log, re.M), name
     draft, final = pages(folder, "main"), pages(folder, "final")
-    assert [heading(p) for p in draft[1:]] == ["Using this template", *SECTIONS]
+    known = {"Using this template", *SECTIONS}
+    assert [heading(p) for p in draft[1:] if heading(p) in known] == [
+        "Using this template",
+        *SECTIONS,
+    ]
+    assert len(draft) == page_count(folder, "main")  # the tips may fill 2 pages, none is blank
     assert [heading(p) for p in final[1:]] == FINAL
     # no page is blank: every page of the PDF holds one of these headings
-    assert page_count(folder, "main") == len(SECTIONS) + 2
     assert page_count(folder, "final") == len(FINAL) + 1
     title = re.sub(r"\s+", " ", final[0])
+    assert "formingworlds.space" in title
     assert "kapteyn" not in title.lower()  # the banner, an image, already names the institute
     for words in (
         LONG,
@@ -378,13 +383,13 @@ def test_the_running_head_and_the_contents(compiled):
     assert head(by_heading["2 Methods"]).startswith("Short title")
     assert head(by_heading["2 Methods"]).endswith("2 Methods")
     assert head(by_heading["References"]).endswith("References")
-    assert head(by_heading["A Extra"]).endswith("A Extra")
+    assert head(by_heading["A Additional material"]).endswith("A Additional material")
     assert LONG not in head(by_heading["2 Methods"])
     draft = {heading(p): p for p in pages(folder, "main")[1:]}
     assert head(draft["2 Methods"]).startswith("Title of the thesis")
     contents = re.sub(r"\s+", " ", by_heading["Contents"])
     for entry in ("1 Introduction", "2.1 Model", "5 Conclusions", "Data and code availability",
-                  "Acknowledgments", "References", "A Extra"):  # fmt: skip
+                  "Acknowledgments", "References", "A Additional material"):  # fmt: skip
         assert entry in contents, entry
     for entry in ("Abstract", "Samenvatting"):
         assert entry not in contents.replace("Contents", ""), entry
@@ -430,7 +435,7 @@ def test_guides_are_grey_and_section_numbers_signal_blue(compiled):
         return int((np.abs(px - rgb).sum(axis=2) < 4).sum())  # exact colour, not edges
 
     grey, blue = (107, 116, 124), (0, 114, 161)  # ink-500 and signal-500
-    intro = 1 + 1 + SECTIONS.index("1 Introduction") + 1  # title page, tips page, then the list
+    intro = 1 + [heading(p) for p in pages(folder, "main")].index("1 Introduction")
     assert near("main", intro, grey) > 200
     assert near("main", intro, blue) > 100
     final_intro = 1 + FINAL.index("1 Introduction") + 1
@@ -444,6 +449,13 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
     text = re.sub(r"\s+", " ", " ".join(pages(folder, "main")))
     assert "Lichtenberg et al. (2021)" in text and "(Lichtenberg et al. 2021)" in text
     assert "Journal of Geophysical Research (Planets), 126" in text
+    for cite in (
+        "(Lichtenberg et al. 2021; Nicholls et al. 2024)",
+        "(e.g., Nicholls et al. 2024)",
+        "(see Lichtenberg et al. 2021, Fig. 3)",
+        "(Nicholls et al. 2024, Sect. 2)",
+    ):
+        assert cite in text, cite
     final = re.sub(r"\s+", " ", " ".join(pages(folder, "final")))
     assert "Test, A. 2020, ApJ" in final  # an ADS journal macro in the .bib
     fonts = subprocess.run(["pdffonts", "main.pdf"], cwd=folder, capture_output=True, text=True)
