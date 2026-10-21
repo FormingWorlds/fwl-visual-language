@@ -70,6 +70,21 @@ Text, headings, lists, notes and captions use named styles, among them Normal, T
 
 In Word for Mac, export a Geist document to PDF with *Best for printing*. The other choice, for electronic distribution, renders through a Microsoft online service; in a test with Word 16.113 it replaced Geist with other fonts. Geist must be installed on the computer; Word 16.113 ships with Aptos.
 
+## Google Docs
+
+```bash
+python -m fwl_visual_language.word templates --gdocs
+```
+
+The command writes the same 5 kinds as Geist `.docx` files made for Google Docs, `Forming Worlds Letter (Google Docs).docx` and so on; the built files are in `templates/`. Google Docs has Geist, so a document keeps the lab type in the browser and in its PDF export. The files differ from the Word templates where Google Docs differs from Word:
+
+- Headings have no numbers, because Google Docs styles hold none; Heading 1 is signal blue instead.
+- Footers have no tab stops, because Google Docs does not keep the right tab stop of a Word footer: the footer text and the page number sit together at the right. The university letter puts the lab logo and the page number in a table without borders.
+- The memo has an empty line between its 2 tables, because Google Docs joins adjacent tables into one, and both tables have fixed widths.
+- The handbook asks for Google's own table of contents (Insert > Table of contents) instead of a Word contents field.
+
+To make a Google Doc from a file, upload it to Google Drive, right-click it and choose Open with > Google Docs; Google saves a converted copy next to it. The named styles (Normal text, Title, Subtitle, Heading 1 to 3) carry the lab fonts, sizes and colours, so text typed in them keeps the lab look. To start a document, open the Google Doc and choose File > Make a copy.
+
 ## Posters
 
 ```bash
