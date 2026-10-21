@@ -16,6 +16,9 @@ signal-blue accents.
 Build them with the ``word`` extra (``python-docx``)::
 
     python -m fwl_visual_language.word templates
+
+``--gdocs`` writes the Geist documents that Google Drive converts into Google
+Docs, adapted to what Google Docs keeps (:func:`build_gdocs`).
 """
 
 import argparse
@@ -24,7 +27,7 @@ from pathlib import Path
 
 from . import assets_dir, palette, ramp
 
-__all__ = ["FACES", "KINDS", "build_word", "template_name"]
+__all__ = ["FACES", "KINDS", "build_gdocs", "build_word", "gdocs_name", "template_name"]
 
 FACES = {
     "geist": {"regular": "Geist", "light": "Geist Light", "medium": "Geist Medium"},
@@ -83,12 +86,29 @@ def template_name(kind, face):
     return f"Forming Worlds {kind.replace('-', ' ').title()} ({face.capitalize()})"
 
 
+def gdocs_name(kind):
+    """Return the file name of one Google Docs template, ``Forming Worlds Memo (Google Docs)``.
+
+    Parameters
+    ----------
+    kind : str
+        One of :data:`KINDS`.
+
+    Returns
+    -------
+    str
+        The name without extension.
+    """
+    return f"Forming Worlds {kind.replace('-', ' ').title()} (Google Docs)"
+
+
 class _Builder:
     """Write one template; the python-docx imports stay inside the build call."""
 
-    def __init__(self, face, docx, chapters="A"):
+    def __init__(self, face, docx, chapters="A", gdocs=False):
         self.f = FACES[face]
         self.chapters = chapters
+        self.gdocs = gdocs
         self.docx = docx
         from docx.oxml import OxmlElement, parse_xml
         from docx.oxml.ns import nsdecls, qn
@@ -160,6 +180,24 @@ class _Builder:
         table._tbl.tblPr.insert_element_before(
             b, "w:shd", "w:tblLayout", "w:tblCellMar", "w:tblLook", "w:tblCaption"
         )
+
+    def full_width(self, table, first=None):
+        """Fix a 2-column table at the text width; ``first`` is column 1 in cm, half by default.
+
+        Google Docs splits a table without fixed widths into equal columns.
+        """
+        from docx.shared import Twips
+
+        total = self.Cm(TEXT_W).twips
+        a = total // 2 if first is None else self.Cm(first).twips
+        table.autofit = False
+        tblw = table._tbl.tblPr.find(self.qn("w:tblW"))
+        tblw.set(self.qn("w:type"), "dxa")
+        tblw.set(self.qn("w:w"), str(total))
+        for col, w in zip(table.columns, (a, total - a), strict=True):
+            col.width = Twips(w)
+            for cell in col.cells:
+                cell.width = Twips(w)
 
     # --- styles ----------------------------------------------------------------------------
 
@@ -255,9 +293,13 @@ class _Builder:
             + lvl(1, "lowerLetter", "%2.", 357, "ListNumber2", left=714)
             + "</w:abstractNum>"
         )
-        for a in (steps, bullet, heads):  # every abstractNum must come before the first num
+        # Google Docs keeps no heading numbers, so its files carry no heading list
+        lists = ((steps, LIST_NUM), (bullet, BULLET_NUM)) + (
+            () if self.gdocs else ((heads, HEADING_NUM),)
+        )
+        for a, _ in lists:  # every abstractNum must come before the first num
             num.insert(0, a)
-        for n in (HEADING_NUM, BULLET_NUM, LIST_NUM):
+        for n in sorted(n for _, n in lists):
             num.append(
                 self.parse(
                     f'<w:num {self.nsdecls("w")} w:numId="{n}">'
@@ -291,10 +333,12 @@ class _Builder:
                 el.getparent().remove(el)
         title = self.style("Title", 24, ink("950"), f["light"], before=18, after=2)
         subtitle = self.style("Subtitle", 12, ink("600"), after=4)
+        # Google Docs styles hold no heading numbers, so Heading 1 is signal blue there instead
+        h1_colour = _hex("signal", "500") if self.gdocs else ink("950")
         if self.chapters == "A":
-            h1 = self.style("Heading 1", 13, ink("950"), f["medium"], before=16, after=6)
+            h1 = self.style("Heading 1", 13, h1_colour, f["medium"], before=16, after=6)
         else:
-            h1 = self.style("Heading 1", 20, ink("950"), f["light"], before=0, after=18)
+            h1 = self.style("Heading 1", 20, h1_colour, f["light"], before=0, after=18)
             h1.paragraph_format.page_break_before = True
         h2 = self.style("Heading 2", 11, ink("950"), f["medium"], before=12, after=4)
         h3 = self.style("Heading 3", 10.5, None, f["medium"], before=10, after=3)
@@ -341,8 +385,9 @@ class _Builder:
             self.style(name, color=theme_colours()[slot], kind=c).font.underline = True
         self.style("Key word", color=_hex("magma", "600"), face=f["medium"], kind=c)
         self.numbering()
-        self.link(h1, HEADING_NUM, 0)
-        self.link(h2, HEADING_NUM, 1)
+        if not self.gdocs:
+            self.link(h1, HEADING_NUM, 0)
+            self.link(h2, HEADING_NUM, 1)
         self.link(self.doc.styles["List Bullet"], BULLET_NUM, 0)
         self.link(self.doc.styles["List Number"], LIST_NUM, 0)
         self.link(self.doc.styles["List Number 2"], LIST_NUM, 1)
@@ -359,10 +404,16 @@ class _Builder:
         return s
 
     def footer(self, part, left):
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
         p = part.paragraphs[0]
         p.style = self.doc.styles["Footer"]
-        self.right_tab(p)
-        p.add_run(left + "\t")
+        if self.gdocs:  # Google Docs drops the right tab: text and number sit at the right
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            p.add_run(left + "  ·  ")
+        else:
+            self.right_tab(p)
+            p.add_run(left + "\t")
         self.page_field(p)
 
     def logo(self, paragraph, width_cm):
@@ -384,6 +435,8 @@ class _Builder:
         hdr = s.first_page_header
         t = hdr.add_table(1, 2, self.Cm(TEXT_W))
         self.no_borders(t)
+        if self.gdocs:
+            self.full_width(t)
         self.logo(t.cell(0, 0).paragraphs[0], 3.6)
         cell = t.cell(0, 1)
         for i, line in enumerate(SENDER):
@@ -403,6 +456,7 @@ class _Builder:
 
     def university_letter(self):
         """The university banner on page 1, the lab logo and the page number in the footer."""
+        from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
         from docx.enum.text import WD_ALIGN_PARAGRAPH
 
         s = self.page()
@@ -420,10 +474,23 @@ class _Builder:
         for part in (s.first_page_footer, s.footer):
             p = part.paragraphs[0]
             p.style = self.doc.styles["Footer"]
-            self.right_tab(p)
-            self.logo(p, 2.0)
-            p.add_run("\t")
-            self.page_field(p)
+            if self.gdocs:  # Google Docs drops the right tab: logo and number in a table
+                t = part.add_table(1, 2, self.Cm(TEXT_W))
+                self.no_borders(t)
+                self.full_width(t)
+                p._p.getparent().append(p._p)  # the empty paragraph Word needs goes below
+                for cell in t.rows[0].cells:
+                    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
+                logo, num = t.cell(0, 0).paragraphs[0], t.cell(0, 1).paragraphs[0]
+                logo.style = num.style = self.doc.styles["Footer"]
+                num.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            else:
+                self.right_tab(p)
+                logo = num = p
+            self.logo(logo, 2.0)
+            if not self.gdocs:
+                p.add_run("\t")
+            self.page_field(num)
         self.letter_body()
 
     def letter_body(self):
@@ -465,16 +532,23 @@ class _Builder:
         s = self.page()
         t = self.doc.add_table(1, 2)
         self.no_borders(t)
+        if self.gdocs:
+            self.full_width(t)
         t.cell(0, 0).paragraphs[0].style = self.doc.styles["Memo label"]
         t.cell(0, 0).paragraphs[0].add_run("MEMO")
         right = t.cell(0, 1).paragraphs[0]
         right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         self.logo(right, 2.0)
+        if self.gdocs:  # Google Docs joins adjacent tables into one
+            self.para(style="Sender")
         rows = self.doc.add_table(4, 2)
         self.no_borders(rows)
         rows.autofit = False
-        for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
-            col.width = self.Cm(w)
+        if self.gdocs:
+            self.full_width(rows, 2.4)
+        else:
+            for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
+                col.width = self.Cm(w)
         for i, (k, v) in enumerate(
             (
                 ("To", "Lab members"),
@@ -489,7 +563,8 @@ class _Builder:
             r = b.add_run(v)
             if k == "Subject":
                 r.font.name = self.f["medium"]
-            rows.cell(i, 0).width, rows.cell(i, 1).width = self.Cm(2.4), self.Cm(TEXT_W - 2.4)
+            if not self.gdocs:
+                rows.cell(i, 0).width, rows.cell(i, 1).width = self.Cm(2.4), self.Cm(TEXT_W - 2.4)
         rule = self.para()
         self.border(rule._p.get_or_add_pPr(), "bottom", _hex("ink", "300"), 4)
         self.para("Text of the memo.")
@@ -510,6 +585,23 @@ class _Builder:
         welcome = self.para("A short welcome that says what the handbook is for and how to use it.")
         welcome.add_run().add_break(WD_BREAK.PAGE)
         self.para("Contents", "TOC Heading")
+        if self.gdocs:  # Google Docs makes its own contents and reads no Word field
+            toc = self.para("Choose Insert > Table of contents to list the chapters here.")
+        else:
+            toc = self.contents_field()
+        toc.add_run().add_break(WD_BREAK.PAGE)
+        self.para("Chapter", "Heading 1")
+        self.para("Text of the chapter.")
+        self.para("Section", "Heading 2")
+        self.para("A step.", "List Number")
+        self.para("A sub-step.", "List Number 2")
+        self.para("Subsection, for example a meeting time", "Heading 3")
+        self.para("A note that stands out from the text.", "Note")
+        self.para("A point in a list.", "List Bullet")
+        self.footer(s.footer, "Forming Worlds Lab  ·  Handbook")
+
+    def contents_field(self):
+        """Return a paragraph with a Word contents field that lists Heading 1 and 2."""
         toc = self.para()
         toc._p.append(
             self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="begin"/></w:r>')
@@ -527,16 +619,7 @@ class _Builder:
         toc._p.append(
             self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="end"/></w:r>')
         )
-        toc.add_run().add_break(WD_BREAK.PAGE)
-        self.para("Chapter", "Heading 1")
-        self.para("Text of the chapter.")
-        self.para("Section", "Heading 2")
-        self.para("A step.", "List Number")
-        self.para("A sub-step.", "List Number 2")
-        self.para("Subsection, for example a meeting time", "Heading 3")
-        self.para("A note that stands out from the text.", "Note")
-        self.para("A point in a list.", "List Bullet")
-        self.footer(s.footer, "Forming Worlds Lab  ·  Handbook")
+        return toc
 
     def save(self, out, template):
         props = self.doc.core_properties
@@ -595,6 +678,24 @@ def rpr_successors(tag):
     return order[order.index(tag) + 1 :]
 
 
+def _docx():
+    try:
+        import docx
+    except ImportError as err:
+        raise ImportError(
+            'the Word templates need python-docx: pip install "fwl-visual-language[word]"'
+        ) from err
+    return docx
+
+
+def _build(face, kind, docx, gdocs=False):
+    b = _Builder(face, docx, "B" if kind == "handbook" else "A", gdocs)
+    b.styles()
+    b.theme()
+    getattr(b, kind.replace("-", "_"))()
+    return b
+
+
 def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
     """Write the Word templates.
 
@@ -622,12 +723,7 @@ def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
     ValueError
         When a face or kind is unknown.
     """
-    try:
-        import docx
-    except ImportError as err:
-        raise ImportError(
-            'the Word templates need python-docx: pip install "fwl-visual-language[word]"'
-        ) from err
+    docx = _docx()
     faces, kinds = list(faces), list(kinds)
     bad = [f for f in faces if f not in FACES] + [k for k in kinds if k not in KINDS]
     if bad:
@@ -637,13 +733,53 @@ def build_word(folder, faces=tuple(FACES), kinds=KINDS, template=True):
     written = []
     for face in faces:
         for kind in kinds:
-            b = _Builder(face, docx, "B" if kind == "handbook" else "A")
-            b.styles()
-            b.theme()
-            getattr(b, kind.replace("-", "_"))()
+            b = _build(face, kind, docx)
             out = folder / f"{template_name(kind, face)}.{'dotx' if template else 'docx'}"
             b.save(out, template)
             written.append(out)
+    return written
+
+
+def build_gdocs(folder, kinds=KINDS):
+    """Write the Geist documents that Google Drive converts into Google Docs templates.
+
+    They differ from the Word templates where Google Docs differs from Word:
+    headings carry no numbers and Heading 1 is signal blue, footers hold no tab
+    characters (text and page number sit at the right; the university letter puts
+    its logo and number in a table), every table has fixed column widths, and the
+    handbook asks for Google's own table of contents instead of a Word field.
+
+    Parameters
+    ----------
+    folder : str or pathlib.Path
+        Output folder; it is created when missing.
+    kinds : iterable of str, optional
+        Members of :data:`KINDS`; all by default.
+
+    Returns
+    -------
+    list of pathlib.Path
+        The written ``.docx`` files.
+
+    Raises
+    ------
+    ImportError
+        When ``python-docx`` is missing.
+    ValueError
+        When a kind is unknown.
+    """
+    docx = _docx()
+    kinds = list(kinds)
+    bad = [k for k in kinds if k not in KINDS]
+    if bad:
+        raise ValueError(f"unknown kind: {bad}; kinds {list(KINDS)}")
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for kind in kinds:
+        out = folder / f"{gdocs_name(kind)}.docx"
+        _build("geist", kind, docx, gdocs=True).save(out, False)
+        written.append(out)
     return written
 
 
@@ -651,14 +787,24 @@ def main(argv=None):
     """Command line entry point: ``python -m fwl_visual_language.word FOLDER``."""
     parser = argparse.ArgumentParser(
         prog="python -m fwl_visual_language.word",
-        description="Write the Forming Worlds Lab Word templates (.dotx).",
+        description="Write the Forming Worlds Lab Word templates (.dotx), or with --gdocs "
+        "the Geist .docx files for Google Docs.",
     )
     parser.add_argument("folder", help="output folder")
-    parser.add_argument("--face", choices=[*FACES, "all"], default="all")
+    parser.add_argument("--face", choices=[*FACES, "all"], help="face of the Word templates")
     parser.add_argument("--docx", action="store_true", help="write .docx documents, not templates")
+    parser.add_argument(
+        "--gdocs", action="store_true", help="write the Geist .docx files for Google Docs"
+    )
     args = parser.parse_args(argv)
-    faces = list(FACES) if args.face == "all" else [args.face]
-    for path in build_word(args.folder, faces, template=not args.docx):
+    if args.gdocs and (args.face or args.docx):
+        parser.error("--gdocs writes Geist .docx files and takes neither --face nor --docx")
+    faces = list(FACES) if args.face in (None, "all") else [args.face]
+    if args.gdocs:
+        written = build_gdocs(args.folder)
+    else:
+        written = build_word(args.folder, faces, template=not args.docx)
+    for path in written:
         print(path)
 
 
