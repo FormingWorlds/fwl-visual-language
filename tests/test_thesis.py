@@ -451,7 +451,7 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
     assert "Journal of Geophysical Research (Planets), 126" in text
     assert "Hamano, K., Abe, Y., & Genda, H. 2013, Nature, 497, 607" in text  # the \\nat macro
     for cite in (
-        "(Lichtenberg et al. 2021; Hamano et al. 2013)",
+        "(Hamano et al. 2013; Lichtenberg et al. 2021)",  # the order of the keys
         "(e.g., Hamano et al. 2013)",
         "(see Lichtenberg et al. 2021, Fig. 3)",
         "(Hamano et al. 2013, Sect. 2)",
