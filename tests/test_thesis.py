@@ -367,7 +367,7 @@ def test_the_example_compiles_with_each_section_on_its_own_page(compiled):
     assert "kapteyn" not in title.lower()  # the banner, an image, already names the institute
     for words in (
         LONG,
-        "BSc thesis Astronomy",
+        "BSc/MSc thesis Astronomy",
         "s1234567",
         "Second examiner",
         "Groningen, Month Year",
