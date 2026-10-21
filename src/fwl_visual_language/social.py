@@ -52,6 +52,7 @@ MONO_MIN = 20  # smallest px of a reference line that shrinks to fit
 CAPTION_PX, CAPTION_LEAD, CAPTION_LINES = 30, 1.3, 4
 STATUS = {"submitted": "Submitted to", "accepted": "Accepted to", "published": "Published in"}
 _CMAPS = {}
+_DRAWING = []  # the file stem of the card that render() draws, for its warnings
 
 
 def ref_line(ref, status=None, journal=None):
@@ -74,19 +75,23 @@ def ref_line(ref, status=None, journal=None):
     Raises
     ------
     ValueError
-        If ``ref`` is empty, only one of ``status`` and ``journal`` is given, a
-        status is not one of the 3, or a journal is blank. An empty or missing
-        status and journal both mean no status.
+        If ``ref`` is not a text or is empty, only one of ``status`` and
+        ``journal`` is given, the status is not one of the 3, or the journal is
+        blank. A status and a journal that are both ``None`` or empty mean no
+        status.
     """
-    if not isinstance(ref, str) or not ref.strip():
+    if not isinstance(ref, str):
+        raise ValueError(f"the reference must be a text, not {ref!r}")
+    if not ref.strip():
         raise ValueError("a card text is empty: the reference")
-    if not status and not journal:
+    if status in (None, "") and journal in (None, ""):
         return ref
     if not isinstance(status, str) or not isinstance(journal, str) or not journal.strip():
         raise ValueError("a status needs a journal and a journal needs a status")
-    if status.lower() not in STATUS:
+    key = status.strip().lower()
+    if key not in STATUS:
         raise ValueError(f"unknown status {status!r}; statuses: {', '.join(STATUS)}")
-    return f"{ref} · {STATUS[status.lower()]} {journal.strip()}"
+    return f"{ref} · {STATUS[key]} {journal.strip()}"
 
 
 def _missing(name, text):
@@ -94,10 +99,16 @@ def _missing(name, text):
     if name not in _CMAPS:
         try:
             from fontTools.ttLib import TTFont
-        except ImportError:  # without fontTools the cards draw, unchecked
-            return []
-        with TTFont(fonts_dir() / "ttf" / f"{name}.ttf") as font:
-            _CMAPS[name] = set(font.getBestCmap())
+        except ImportError:
+            if None not in _CMAPS.values():  # warn once
+                msg = "fontTools is not installed: the cards are drawn without a glyph check"
+                warnings.warn(msg, stacklevel=4)
+            _CMAPS[name] = None
+        else:
+            with TTFont(fonts_dir() / "ttf" / f"{name}.ttf") as font:
+                _CMAPS[name] = set(font.getBestCmap())
+    if _CMAPS[name] is None:
+        return []
     return sorted({ch for ch in text if not ch.isspace() and ord(ch) not in _CMAPS[name]})
 
 
@@ -181,8 +192,9 @@ class _Card:
         gone = _missing(self.name(face), text)
         if gone:
             chars = ", ".join(f"{ch} (U+{ord(ch):04X})" for ch in gone)
+            card = f"card {_DRAWING[-1]!r}: " if _DRAWING else ""
             warnings.warn(
-                f"{self.name(face)} has no glyph for {chars}; "
+                f"{card}{self.name(face)} has no glyph for {chars}; "
                 f"it draws a blank box in {text[:40]!r}",
                 stacklevel=3,
             )
@@ -386,14 +398,16 @@ def glance_card(out, text, ref, label="At a glance", size=SIZE, *, status=None, 
     Raises
     ------
     ValueError
-        If a text does not fit its space on the card.
+        If a text does not fit its space on the card, or :func:`ref_line`
+        refuses the reference, status or journal.
     """
     c = _Card(size)
     c.label((64, 64), label, 28)
     c.block((64, 118), text, "Regular", 41, INK["100"], SIZE - 128, 1.36, 15)
     ref = ref_line(ref, status, journal)
-    c.fit((64, SIZE - 96), ref, "mono", 28, INK["400"], c.logo_room(64, 60))
-    c.logo((64, SIZE - 112), 60)
+    logo_h = 60
+    c.fit((64, SIZE - 96), ref, "mono", 28, INK["400"], c.logo_room(64, logo_h))
+    c.logo((64, SIZE - 112), logo_h)
     return c.save(out)
 
 
@@ -403,9 +417,8 @@ def figure_card(
     """Write the figure card: headline, the figure, an optional caption, source and reference.
 
     With a caption, the caption sits under the panel and the source under the caption,
-    and the figure gets less height: its budget ends 140 px above the foot, less the
-    caption height, against 150 px without a caption, since the 26 px of gaps
-    (18 + 8) and the smaller source line fit in 36 px plus those 10 px.
+    and the figure gets less height: the bottom of its panel may reach
+    ``SIZE - 140 - (36 + 39 * lines)`` px, against ``SIZE - 150`` without a caption.
 
     Parameters
     ----------
@@ -435,8 +448,9 @@ def figure_card(
     ------
     ValueError
         If the headline needs more than 2 lines, the caption more than 4, the
-        source more than 1, the reference does not fit 1 line at 20 px, or the
-        figure is too tall for the space left. A caption never shrinks.
+        source more than 1, the reference does not fit 1 line at 20 px or
+        :func:`ref_line` refuses it, or the figure is too tall for the space
+        left. A caption never shrinks.
     """
     c = _Card(size)
     ref = ref_line(ref, status, journal)
@@ -487,8 +501,9 @@ def figure_card(
             CAPTION_LINES,
         )
         c.block((MARGIN, y + 8), source, "Regular", 26, INK["300"], SIZE - 2 * MARGIN - 130, 1, 1)
-    c.fit((MARGIN, SIZE - 76), ref, "mono", 26, INK["300"], c.logo_room(MARGIN, 52))
-    c.logo((MARGIN, SIZE - 96), 52)
+    logo_h = 52
+    c.fit((MARGIN, SIZE - 76), ref, "mono", 26, INK["300"], c.logo_room(MARGIN, logo_h))
+    c.logo((MARGIN, SIZE - 96), logo_h)
     return c.save(out)
 
 
@@ -522,7 +537,8 @@ def cover_card(
     Raises
     ------
     ValueError
-        If a text does not fit its space on the card.
+        If a text does not fit its space on the card, or :func:`ref_line`
+        refuses the reference, status or journal.
     """
     c = _Card(size)
     c.label((64, 110), label, 28)
@@ -530,8 +546,9 @@ def cover_card(
     c.d.rectangle((c.u(64), c.u(y + 30), c.u(174), c.u(y + 36)), fill=SIGNAL["400"])
     c.block((64, SIZE - 160), lead, "Regular", 32, INK["300"], SIZE - 128 - 180, 1.2, 1)
     ref = ref_line(ref, status, journal)
-    c.fit((64, SIZE - 112), ref, "mono", 28, INK["300"], c.logo_room(64, 60))
-    c.logo((64, SIZE - 124), 60)
+    logo_h = 60
+    c.fit((64, SIZE - 112), ref, "mono", 28, INK["300"], c.logo_room(64, logo_h))
+    c.logo((64, SIZE - 124), logo_h)
     return c.save(out)
 
 
@@ -716,8 +733,13 @@ def render(spec, folder):
         Before any card is written: if ``cards`` is missing, an entry lacks
         ``card`` or ``file``, a card name is unknown, a file stem holds a path
         separator, or 2 stems differ only in case. While writing: if a card
-        refuses its texts or images. A card that draws a character Geist has no
-    glyph for gives a warning that names the card.
+        refuses its texts or images.
+
+    Warns
+    -----
+    UserWarning
+        When a card draws a character that Geist has no glyph for; the
+        warning names the card.
     """
     import inspect
 
@@ -760,11 +782,11 @@ def render(spec, folder):
         for key in ("entries", "focus", "box"):
             if key in args:
                 args[key] = [tuple(e) for e in args[key]] if key == "entries" else tuple(args[key])
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        _DRAWING.append(stem)
+        try:
             written.append(CARDS[kind](Path(folder) / f"{stem}.png", **args))
-        for w in caught:  # name the card in each warning
-            warnings.warn(f"card {stem!r}: {w.message}", w.category, stacklevel=2)
+        finally:
+            _DRAWING.pop()
     return written
 
 

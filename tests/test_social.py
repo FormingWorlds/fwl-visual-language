@@ -661,7 +661,7 @@ def test_a_long_reference_shrinks_to_the_largest_size_that_fits(
 def test_a_shrunk_reference_ends_32_px_before_the_logo(tmp_path, figure, drawn, make, logo):
     make(tmp_path / "x.png", figure)
     (box,) = [b for b, t, _ in drawn if t == LONG_REF]
-    assert box[2] <= logo[0] - 32 + 1 and not overlaps(box, logo)
+    assert box[2] <= logo[0] - 32 and not overlaps(box, logo)
 
 
 @pytest.mark.parametrize(
@@ -758,6 +758,8 @@ def test_size_stays_the_positional_argument_after_the_reference(tmp_path, figure
         ("  ", "accepted", "ApJ", "empty"),
         ("arXiv:1", "accepted", "   ", "needs a journal"),
         ("arXiv:1", 3, "ApJ", "needs a journal"),
+        ("arXiv:1", 0, None, "needs a journal"),
+        (None, None, None, "must be a text"),
     ],
 )
 def test_the_reference_line_refuses_an_empty_reference_or_journal(ref, status, journal, match):
@@ -765,8 +767,19 @@ def test_the_reference_line_refuses_an_empty_reference_or_journal(ref, status, j
         social.ref_line(ref, status, journal)
 
 
-def test_an_empty_status_and_journal_mean_no_status():
+def test_an_empty_status_and_journal_mean_no_status_and_spaces_are_trimmed():
     assert social.ref_line("arXiv:1", "", "") == "arXiv:1"
+    assert social.ref_line("arXiv:1", "", None) == "arXiv:1"
+    assert social.ref_line("arXiv:1", " Accepted ", " ApJ ") == "arXiv:1 · Accepted to ApJ"
+
+
+@pytest.mark.parametrize("margin, height", [(64, 60), (48, 52)])
+def test_the_reference_room_ends_32_px_before_the_drawn_logo(margin, height):
+    for size in (1080, 540):
+        c = social._Card(size)
+        drawn = round(LOGO.width * c.u(height) / LOGO.height)
+        assert c.logo_width(height) == drawn
+        assert c.logo_room(margin, height) == 1080 - 2 * margin - drawn / c.s - 32
 
 
 def origins(monkeypatch):
@@ -814,7 +827,7 @@ def test_the_caption_takes_its_height_from_the_figure_budget(tmp_path, lines, fi
 def test_a_reference_shrinks_down_to_20_px_and_no_further(tmp_path, monkeypatch):
     c = social._Card(1080)
     room = c.logo_room(64, 60)
-    assert room == 1080 - 128 - round(1200 * 60 / 662) - 32
+    assert room == 1080 - 128 - round(LOGO.width * 60 / LOGO.height) - 32
     n = 1
     while c.d.textlength("x" * (n + 1), font=c.font("mono", 20)) <= c.u(room):
         n += 1
@@ -873,15 +886,34 @@ def test_every_face_has_the_subscript_digits_and_lacks_eta(face):
     assert social._missing(name, "η⁻") == ["η", "⁻"]
 
 
-def test_without_fonttools_the_cards_draw_without_a_glyph_check(tmp_path, monkeypatch, recwarn):
+def test_without_fonttools_the_cards_draw_and_say_the_check_is_off(tmp_path, monkeypatch, recwarn):
     monkeypatch.setitem(sys.modules, "fontTools", None)
     monkeypatch.setitem(sys.modules, "fontTools.ttLib", None)
     monkeypatch.setattr(social, "_CMAPS", {})
     social.glance_card(tmp_path / "g.png", "η matters", "r")
-    assert [w for w in recwarn if "no glyph" in str(w.message)] == []
+    social.glance_card(tmp_path / "h.png", "η matters", "r")
+    messages = [str(w.message) for w in recwarn]
+    assert not any("no glyph" in m for m in messages)
+    off = [m for m in messages if "without a glyph check" in m]
+    assert len(off) == 1
 
 
 def test_render_names_the_card_in_a_glyph_warning(tmp_path):
     spec = {"cards": [{"card": "glance", "file": "eta-card", "text": "η matters", "ref": "r"}]}
     with pytest.warns(UserWarning, match="card 'eta-card': Geist-Regular has no glyph for η"):
         social.render(spec, tmp_path)
+
+
+def test_a_glyph_warning_raised_as_an_error_stops_render_before_the_card_is_saved(tmp_path):
+    import warnings
+
+    spec = {"cards": [{"card": "glance", "file": "eta", "text": "η matters", "ref": "r"}]}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(UserWarning, match="card 'eta'"):
+            social.render(spec, tmp_path)
+    assert not (tmp_path / "eta.png").exists()
+    assert social._DRAWING == []
+    with pytest.warns(UserWarning) as caught:  # outside render a warning names no card
+        social.glance_card(tmp_path / "g.png", "η matters", "r")
+    assert not any("card '" in str(w.message) for w in caught)
