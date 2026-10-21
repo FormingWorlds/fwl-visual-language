@@ -121,11 +121,11 @@ _BODY = r"""\newif\iffwl@final
   \renewcommand{\section}{\clearpage\@ifstar{\fwl@starred}{\fwl@section}}}
 \newcommand{\fwl@starred}[1]{\iffwl@listed\phantomsection\fi\fwl@section*{#1}\markboth{#1}{}%
   \iffwl@listed\addcontentsline{toc}{section}{#1}\fi}
-% A title wider than half the head needs \shorttitle
+% A head title wider than 0.55 of the text width needs a shorter \shorttitle
 \AtBeginDocument{\begingroup\let\\\relax
   \settowidth{\@tempdima}{\ttfamily\footnotesize\fwl@short}%
-  \ifdim\@tempdima>0.55\textwidth\ClassWarningNoLine{fwlthesis}{The title is too long
-    for the running head; give a short form with \protect\shorttitle}\fi\endgroup}
+  \ifdim\@tempdima>0.55\textwidth\ClassWarningNoLine{fwlthesis}{The title is too wide
+    for the running head; give a shorter one with \protect\shorttitle}\fi\endgroup}
 
 % Title page
 \newcommand{\fwl@type}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
@@ -184,10 +184,16 @@ def thesis_cls(release=None):
 
 
 def _taken(dest, rel):
-    """Return whether ``rel`` or a folder on its way is taken by a file or a link in ``dest``."""
-    path = dest / rel
-    folders = [dest / parent for parent in Path(rel).parents if str(parent) != "."]
-    return os.path.lexists(path) or any(os.path.lexists(f) and not f.is_dir() for f in folders)
+    """Return the path that keeps ``rel`` from being written in ``dest``, or ``None``.
+
+    That is ``rel`` itself when a file or a link holds it, or a folder on its way
+    that is a file or a link to no folder.
+    """
+    folders = [dest / parent for parent in reversed(Path(rel).parents) if str(parent) != "."]
+    for folder in folders:
+        if os.path.lexists(folder) and not folder.is_dir():
+            return folder.relative_to(dest).as_posix()
+    return rel if os.path.lexists(dest / rel) else None
 
 
 def install_thesis(dest, example=False):
@@ -211,11 +217,12 @@ def install_thesis(dest, example=False):
     Raises
     ------
     FileExistsError
-        If ``example`` is true and ``dest`` already holds a file of the example.
+        If ``example`` is true and a file or a link in ``dest`` holds the place of a
+        file of the example or of a folder on its way.
     """
     dest = Path(dest)
     src = Path(__file__).resolve().parent / "thesis_example"
-    taken = [rel for rel in EXAMPLE_FILES if example and _taken(dest, rel)]
+    taken = sorted({_taken(dest, rel) for rel in EXAMPLE_FILES if example} - {None})
     if taken:
         raise FileExistsError(
             f"already in {dest}: {', '.join(taken)}; install the example elsewhere"

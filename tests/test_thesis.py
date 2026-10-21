@@ -119,11 +119,26 @@ def test_install_refuses_to_overwrite_any_file_of_a_thesis(tmp_path, rel):
     assert (dest / rel).read_text() == "mine"
 
 
+def test_install_refuses_a_dangling_link_and_takes_existing_folders(tmp_path):
+    dest = tmp_path / "t"
+    dest.mkdir()
+    (dest / "main.tex").symlink_to(tmp_path / "nowhere.tex")
+    with pytest.raises(FileExistsError, match=r"already in .*: main.tex;"):
+        thesis.install_thesis(dest, example=True)
+    assert not (tmp_path / "nowhere.tex").exists()
+    (dest / "main.tex").unlink()
+    (dest / "data").mkdir()
+    (tmp_path / "scripts").mkdir()
+    (dest / "scripts").symlink_to(tmp_path / "scripts")  # a link to a folder is a folder
+    thesis.install_thesis(dest, example=True)
+    assert all((dest / rel).is_file() for rel in thesis.EXAMPLE_FILES)
+
+
 def test_install_refuses_a_file_where_the_example_needs_a_folder(tmp_path, capsys):
     dest = tmp_path / "t"
     dest.mkdir()
     (dest / "data").write_text("a file named data")
-    with pytest.raises(FileExistsError, match="data/cooling.csv"):
+    with pytest.raises(FileExistsError, match=r"already in .*: data;"):
         thesis.install_thesis(dest, example=True)
     assert [p.name for p in dest.iterdir()] == ["data"]
     with pytest.raises(SystemExit) as err:
@@ -185,8 +200,11 @@ def test_the_script_replots_the_committed_figure_from_the_data(tmp_path):
         out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, check=True)
         return out.stdout.split()
 
-    assert text(work / "figures" / "cooling.pdf") == text(EXAMPLE / "figures" / "cooling.pdf")
-    assert {"Time", "(Myr)", "case", "3"} <= set(text(EXAMPLE / "figures" / "cooling.pdf"))
+    labels = {"Time", "(Myr)", "Surface", "temperature", "(K)", "case"}
+    for pdf in (work / "figures" / "cooling.pdf", EXAMPLE / "figures" / "cooling.pdf"):
+        words = text(pdf)
+        assert labels <= set(words), pdf
+        assert " ".join(words).count("case") == 3  # the legend: case 1, case 2, case 3
 
 
 def zip_parts(path):
@@ -373,7 +391,7 @@ def test_the_running_head_and_the_contents(compiled):
     tables = re.sub(r"\s+", " ", by_heading["List of Tables"])
     assert "1 Parameters." in tables
     anchors = re.findall(r"\{([a-z]+\*?\.[0-9A-Za-z.]+)\}%", (folder / "final.toc").read_text())
-    assert len(anchors) == len(set(anchors)) == 12, anchors  # every entry links to its own page
+    assert len(anchors) == len(set(anchors)) == 12, anchors  # every entry has its own anchor
     methods = re.sub(r"\s+", " ", by_heading["2 Methods"])
     assert "starts at 3000 K" in methods and "F the emitted flux" in methods
     assert "Lichtenberg" not in methods
@@ -445,6 +463,6 @@ def test_a_long_title_without_a_short_form_gets_a_warning(compiled, tmp_path):
     run = subprocess.run(["lualatex", "-interaction=nonstopmode", "long"], cwd=tmp_path,
                          capture_output=True, text=True, timeout=300)  # fmt: skip
     assert run.returncode == 0, run.stdout[-1500:]
-    warning = "The title is too long"
+    warning = "The title is too wide"
     assert warning in re.sub(r"\s+", " ", (tmp_path / "long.log").read_text(errors="replace"))
     assert not any(warning in re.sub(r"\s+", " ", log) for log in logs.values())

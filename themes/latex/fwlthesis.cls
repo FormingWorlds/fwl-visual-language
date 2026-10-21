@@ -57,11 +57,11 @@
   \renewcommand{\section}{\clearpage\@ifstar{\fwl@starred}{\fwl@section}}}
 \newcommand{\fwl@starred}[1]{\iffwl@listed\phantomsection\fi\fwl@section*{#1}\markboth{#1}{}%
   \iffwl@listed\addcontentsline{toc}{section}{#1}\fi}
-% A title wider than half the head needs \shorttitle
+% A head title wider than 0.55 of the text width needs a shorter \shorttitle
 \AtBeginDocument{\begingroup\let\\\relax
   \settowidth{\@tempdima}{\ttfamily\footnotesize\fwl@short}%
-  \ifdim\@tempdima>0.55\textwidth\ClassWarningNoLine{fwlthesis}{The title is too long
-    for the running head; give a short form with \protect\shorttitle}\fi\endgroup}
+  \ifdim\@tempdima>0.55\textwidth\ClassWarningNoLine{fwlthesis}{The title is too wide
+    for the running head; give a shorter one with \protect\shorttitle}\fi\endgroup}
 
 % Title page
 \newcommand{\fwl@type}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
