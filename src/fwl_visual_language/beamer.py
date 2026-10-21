@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 from . import __version__, assets_dir, fonts_dir
-from .latex import FONT_DIR, install_latex
+from .latex import ADS_MACROS, FONT_DIR, install_latex
 
 __all__ = ["ASSET_DIR", "THEME_NAME", "beamer_theme", "install_beamer"]
 
@@ -28,20 +28,6 @@ ASSET_DIR = "fwl-assets"
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
 _LOGO = "fwl-logo-white.png"
 
-ADS_MACROS = r"""% ADS journal macros, at \begin{document} and only where the preamble defines none
-\AtBeginDocument{%
-\providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
-\providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
-\providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
-\providecommand{\baas}{BAAS}\providecommand{\icarus}{Icarus}\providecommand{\jcap}{JCAP}
-\providecommand{\jgr}{JGR}\providecommand{\grl}{GRL}\providecommand{\gca}{GCA}
-\providecommand{\jqsrt}{JQSRT}\providecommand{\mnras}{MNRAS}\providecommand{\nat}{Nature}
-\providecommand{\na}{New Astron.}\providecommand{\pasa}{PASA}\providecommand{\pasj}{PASJ}
-\providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
-\providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
-\providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
-\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}}
-"""
 _BODY = (
     r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
   {\PackageError{beamerthemefwl}{fwl.sty is older than this theme}{Install both again.}}%

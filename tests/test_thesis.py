@@ -45,6 +45,10 @@ def test_the_class_text_has_the_options_guidance_and_journal_macros():
     assert "\\newcommand{\\figuredata}[1]{ Data and script: \\url{#1}.}" in text
     assert "\\providecommand{\\apj}{ApJ}" in text and "\\providecommand{\\mnras}{MNRAS}" in text
     assert "rug-banner-ink.png" in text and "fwl-logo-ink.png" in text
+    for command in ("\\thesistype", "\\shorttitle", "\\listoffigures", "\\listoftables"):
+        assert f"\\newcommand{{{command}}}" in text or f"\\renewcommand{{{command}}}" in text
+    assert "\\iffwl@listed\\addcontentsline{toc}{section}{#1}\\fi" in text
+    assert "\\MakeUppercase" not in text and "\\degree" not in text
     assert text.endswith("\\endinput\n") and text.count("\\endinput") == 1
     assert "2027/01/01" in thesis.thesis_cls(release=__import__("datetime").date(2027, 1, 1))
 
@@ -67,28 +71,41 @@ def test_install_with_the_example_copies_every_example_file(tmp_path):
     files = sorted(
         p.relative_to(EXAMPLE).as_posix()
         for p in EXAMPLE.rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts
+        if p.is_file() and "__pycache__" not in p.parts and not p.name.startswith(".")
     )
-    assert files == [
-        "data/cooling.csv",
-        "figures/cooling.pdf",
-        "latexmkrc",
-        "main.tex",
-        "references.bib",
-        "scripts/plot_cooling.py",
-    ]
+    assert (
+        files
+        == sorted(thesis.EXAMPLE_FILES)
+        == [
+            "data/cooling.csv",
+            "figures/cooling.pdf",
+            "latexmkrc",
+            "main.tex",
+            "references.bib",
+            "scripts/plot_cooling.py",
+        ]
+    )
     for rel in files:
         assert filecmp.cmp(EXAMPLE / rel, tmp_path / "t" / rel, shallow=False), rel
+    (EXAMPLE / ".stray-test-file").write_text("x")  # a dot file in the package is not copied
+    try:
+        thesis.install_thesis(tmp_path / "u", example=True)
+    finally:
+        (EXAMPLE / ".stray-test-file").unlink()
+    assert not (tmp_path / "u" / ".stray-test-file").exists()
 
 
-def test_install_refuses_to_overwrite_a_thesis(tmp_path):
+@pytest.mark.parametrize("rel", ["main.tex", "references.bib", "data/cooling.csv"])
+def test_install_refuses_to_overwrite_any_file_of_a_thesis(tmp_path, rel):
     dest = tmp_path / "t"
-    dest.mkdir()
-    (dest / "main.tex").write_text("my thesis")
-    with pytest.raises(FileExistsError, match="main.tex exists"):
+    (dest / rel).parent.mkdir(parents=True)
+    (dest / rel).write_text("mine")
+    with pytest.raises(FileExistsError, match=f"{rel} exist in"):
         thesis.install_thesis(dest, example=True)
-    assert [p.name for p in dest.iterdir()] == ["main.tex"]
-    assert (dest / "main.tex").read_text() == "my thesis"
+    assert sorted(p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()) == [rel]
+    assert (dest / rel).read_text() == "mine"
+    thesis.install_thesis(dest)  # without the example nothing of the thesis is touched
+    assert (dest / rel).read_text() == "mine"
 
 
 def test_the_ink_banner_is_the_university_banner_in_ink():
@@ -115,6 +132,7 @@ def test_the_example_data_holds_the_3_cases_of_the_figure():
 
 
 @pytest.mark.skipif(importlib.util.find_spec("fwl_mpl") is None, reason="no fwl-mpl")
+@pytest.mark.skipif(not shutil.which("pdftoppm"), reason="no pdftoppm")
 def test_the_script_replots_the_committed_figure_from_the_data(tmp_path):
     work = tmp_path / "t"
     shutil.copytree(EXAMPLE, work, ignore=shutil.ignore_patterns("__pycache__"))
@@ -123,9 +141,20 @@ def test_the_script_replots_the_committed_figure_from_the_data(tmp_path):
         [sys.executable, "scripts/plot_cooling.py"], cwd=work, capture_output=True, text=True
     )
     assert run.returncode == 0, run.stderr
-    assert (work / "figures" / "cooling.pdf").read_bytes() == (
-        EXAMPLE / "figures" / "cooling.pdf"
-    ).read_bytes()
+    import numpy as np
+    from PIL import Image
+
+    def pixels(pdf, name):
+        subprocess.run(
+            ["pdftoppm", "-r", "100", "-png", "-singlefile", pdf, tmp_path / name], check=True
+        )
+        return np.asarray(Image.open(tmp_path / f"{name}.png").convert("L")).astype(int)
+
+    new = pixels(work / "figures" / "cooling.pdf", "new")
+    old = pixels(EXAMPLE / "figures" / "cooling.pdf", "old")
+    assert new.shape == old.shape
+    assert (np.abs(new - old) > 64).mean() < 0.002  # the same plot, up to anti-aliasing
+    assert (old < 128).mean() > 0.01  # the canary: the figure is not blank
 
 
 def zip_parts(path):
@@ -182,15 +211,32 @@ def test_the_theme_build_holds_the_class():
     assert cli.OUTPUTS["latex/fwlthesis.cls"] is thesis.thesis_cls
 
 
+EXTRA_BIB = (
+    "@ARTICLE{Test2020, author = {{Test}, Ann}, title = {A test entry},"
+    " journal = {\\apj}, year = 2020}\n"
+)
+LONG = "A long thesis title that runs over more than one line of the title page and the head"
+
+
 @pytest.fixture(scope="module")
 def compiled(tmp_path_factory):
-    """Compile the example with and without the final option."""
+    """Compile the example as shipped, and a final version with more of the class."""
     folder = tmp_path_factory.mktemp("thesis")
     thesis.install_thesis(folder, example=True)
     main = (folder / "main.tex").read_text()
-    (folder / "final.tex").write_text(
-        main.replace("\\documentclass{fwlthesis}", "\\documentclass[final]{fwlthesis}", 1)
-    )
+    final = main
+    for old, new in (
+        ("\\documentclass{fwlthesis}", "\\documentclass[final]{fwlthesis}"),
+        ("\\title{Title of the thesis}", f"\\title{{{LONG}}}\\shorttitle{{Short title}}"),
+        ("\\tableofcontents\n", "\\tableofcontents\n\\listoffigures\n"),
+        ("The surface radiates", "\\subsection{Model}\nThe surface radiates"),
+        ("\\bibliography{references}", "\\nocite{Test2020}\\bibliography{references,extra}"),
+        ("% \\appendix\n% \\section{Appendix title}", "\\appendix\n\\section{Extra}\nText."),
+    ):
+        assert final.count(old) == 1, old
+        final = final.replace(old, new)
+    (folder / "final.tex").write_text(final)
+    (folder / "extra.bib").write_text(EXTRA_BIB)
     logs = {}
     for name in ("main", "final"):
         steps = (["lualatex"], ["bibtex"], ["lualatex"], ["lualatex"])
@@ -204,6 +250,11 @@ def compiled(tmp_path_factory):
     return folder, logs
 
 
+def page_count(folder, name):
+    info = subprocess.run(["pdfinfo", f"{name}.pdf"], cwd=folder, capture_output=True, text=True)
+    return int(re.search(r"^Pages:\s+(\d+)", info.stdout, re.M).group(1))
+
+
 def pages(folder, name):
     text = subprocess.run(
         ["pdftotext", "-layout", f"{name}.pdf", "-"], cwd=folder, capture_output=True, text=True
@@ -214,21 +265,74 @@ def pages(folder, name):
 def heading(page):
     lines = [re.sub(r"\s+", " ", ln).strip() for ln in page.splitlines() if ln.strip()]
     first = lines[1]  # line 0 is the running head
-    return f"{first} {lines[2]}" if first.isdigit() else first
+    numbered = first.isdigit() or re.fullmatch("[A-Z]", first)  # 1 Introduction, A Extra
+    return f"{first} {lines[2]}" if numbered else first
+
+
+FINAL = [
+    "Abstract",
+    "Samenvatting",
+    "Contents",
+    "List of Figures",
+    "1 Introduction",
+    "2 Methods",
+    "3 Results",
+    "4 Discussion",
+    "5 Conclusions",
+    "Data and code availability",
+    "Acknowledgments",
+    "References",
+    "A Extra",
+]
+LOG_FAULTS = r"^!|Overfull|undefined|Missing character|Package fancyhdr Warning"
+
+
+def head(page):
+    return re.sub(r"\s+", " ", next(ln for ln in page.splitlines() if ln.strip())).strip()
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
 def test_the_example_compiles_with_each_section_on_its_own_page(compiled):
     folder, logs = compiled
     for name, log in logs.items():
-        assert not re.search(r"^!|Overfull|undefined|Missing character", log, re.M), name
+        assert not re.search(LOG_FAULTS, log, re.M), name
     draft, final = pages(folder, "main"), pages(folder, "final")
-    assert [heading(p) for p in final[1:]] == SECTIONS
     assert [heading(p) for p in draft[1:]] == ["Using this template", *SECTIONS]
+    assert [heading(p) for p in final[1:]] == FINAL
+    # no page is blank: every page of the PDF holds one of these headings
+    assert page_count(folder, "main") == len(SECTIONS) + 2
+    assert page_count(folder, "final") == len(FINAL) + 1
     title = re.sub(r"\s+", " ", final[0])
-    for words in ("BSC THESIS ASTRONOMY", "KAPTEYN ASTRONOMICAL INSTITUTE", "Title of the thesis",
-                  "s1234567", "Second examiner", "Groningen, Month Year"):  # fmt: skip
+    for words in (
+        LONG,
+        "BSc thesis Astronomy",
+        "s1234567",
+        "Second examiner",
+        "Groningen, Month Year",
+    ):
         assert words in title, words
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_the_running_head_and_the_contents(compiled):
+    folder, _ = compiled
+    final = pages(folder, "final")
+    by_heading = {heading(p): p for p in final[1:]}
+    assert head(by_heading["2 Methods"]).split("  ")[0].startswith("Short title")
+    assert head(by_heading["2 Methods"]).endswith("2 Methods")
+    assert head(by_heading["References"]).endswith("References")
+    assert head(by_heading["A Extra"]).endswith("A Extra")
+    assert LONG not in head(by_heading["2 Methods"])
+    draft = {heading(p): p for p in pages(folder, "main")[1:]}
+    assert head(draft["2 Methods"]).startswith("Title of the thesis")
+    contents = re.sub(r"\s+", " ", by_heading["Contents"])
+    for entry in ("1 Introduction", "2.1 Model", "5 Conclusions", "Data and code availability",
+                  "Acknowledgments", "References", "A Extra"):  # fmt: skip
+        assert entry in contents, entry
+    for entry in ("Abstract", "Samenvatting"):
+        assert entry not in contents.replace("Contents", ""), entry
+    figures = re.sub(r"\s+", " ", by_heading["List of Figures"])
+    assert "1 Surface temperature against time" in figures and "zenodo" not in figures
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -238,8 +342,36 @@ def test_the_final_option_hides_every_guide(compiled):
     final = " ".join(pages(folder, "final"))
     for words in GUIDE:
         assert words in draft and words not in final, words
-    for words in ("Context.", "Stefan", "Data and script: https://doi.org/10.5281/zenodo.0000000"):
+    for words in (
+        "Context.",
+        "Stefan-Boltzmann",
+        "Data and script: https://doi.org/10.5281/zenodo.0000000",
+    ):
         assert words in re.sub(r"\s+", " ", final), words
+
+
+@pytest.mark.skipif(not TEX or not shutil.which("pdftoppm"), reason="no TeX")
+def test_guides_are_grey_and_section_numbers_signal_blue(compiled):
+    import numpy as np
+    from PIL import Image
+
+    folder, _ = compiled
+
+    def near(name, page, rgb):
+        stem = folder / f"{name}-p{page}"
+        pick = ["-f", str(page), "-l", str(page)]
+        args = ["pdftoppm", "-r", "100", "-png", "-singlefile", *pick, f"{name}.pdf", str(stem)]
+        subprocess.run(args, cwd=folder, check=True)
+        px = np.asarray(Image.open(f"{stem}.png").convert("RGB")).astype(int)
+        return int((np.abs(px - rgb).sum(axis=2) < 4).sum())  # exact colour, not edges
+
+    grey, blue = (107, 116, 124), (0, 114, 161)  # ink-500 and signal-500
+    intro = 1 + 1 + SECTIONS.index("1 Introduction") + 1  # title page, tips page, then the list
+    assert near("main", intro, grey) > 200
+    assert near("main", intro, blue) > 100
+    final_intro = 1 + FINAL.index("1 Introduction") + 1
+    assert near("final", final_intro, grey) < 30
+    assert near("final", final_intro, blue) > 100
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -248,6 +380,8 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
     text = re.sub(r"\s+", " ", " ".join(pages(folder, "main")))
     assert "Lichtenberg et al. (2021)" in text and "(Lichtenberg et al. 2021)" in text
     assert "Journal of Geophysical Research (Planets), 126" in text
+    final = re.sub(r"\s+", " ", " ".join(pages(folder, "final")))
+    assert "Test, A. 2020, ApJ" in final  # an ADS journal macro in the .bib
     fonts = subprocess.run(["pdffonts", "main.pdf"], cwd=folder, capture_output=True, text=True)
     names = {ln.split()[0].split("+")[-1] for ln in fonts.stdout.splitlines()[2:]}
     assert names == {

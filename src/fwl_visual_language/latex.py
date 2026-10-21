@@ -42,6 +42,21 @@ _TTF = (
     "Inter-SemiBold.ttf",
     "Inter-SemiBoldItalic.ttf",
 )
+# ADS journal macros, shared by the beamer theme and the thesis class
+ADS_MACROS = r"""% ADS journal macros, at \begin{document} and only where the preamble defines none
+\AtBeginDocument{%
+\providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
+\providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
+\providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
+\providecommand{\baas}{BAAS}\providecommand{\icarus}{Icarus}\providecommand{\jcap}{JCAP}
+\providecommand{\jgr}{JGR}\providecommand{\grl}{GRL}\providecommand{\gca}{GCA}
+\providecommand{\jqsrt}{JQSRT}\providecommand{\mnras}{MNRAS}\providecommand{\nat}{Nature}
+\providecommand{\na}{New Astron.}\providecommand{\pasa}{PASA}\providecommand{\pasj}{PASJ}
+\providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
+\providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
+\providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
+\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}}
+"""
 _LICENCES = ("OFL-Geist.txt", "OFL-Inter.txt", "OFL-STIX.txt")
 # Bold is SemiBold (600) upright and italic; \fwlmedium selects Medium (500).
 _GEIST = """

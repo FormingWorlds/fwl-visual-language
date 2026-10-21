@@ -68,7 +68,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends texlive-luatex texlive-latex-recommended \
             texlive-latex-extra texlive-bibtex-extra texlive-science texlive-publishers poppler-utils
       - name: Install
-        run: pip install -e ".[test]"
+        run: |
+          pip install -e ".[test]"
+          pip install --no-deps "fwl-mpl @ git+https://github.com/FormingWorlds/fwl-mpl"
       - name: Compile and check the embedded fonts (fails if a test is skipped)
         run: |
           set -o pipefail
@@ -86,6 +88,9 @@ jobs:
             tests/test_beamer.py::test_talk_embeds_the_lab_fonts \
             tests/test_thesis.py::test_the_example_compiles_with_each_section_on_its_own_page \
             tests/test_thesis.py::test_the_final_option_hides_every_guide \
-            tests/test_thesis.py::test_citations_are_author_year_and_the_fonts_are_the_lab_fonts | tee out.txt
-          grep -qE "(^|[^0-9])29 passed" out.txt
+            tests/test_thesis.py::test_citations_are_author_year_and_the_fonts_are_the_lab_fonts \
+            tests/test_thesis.py::test_the_running_head_and_the_contents \
+            tests/test_thesis.py::test_guides_are_grey_and_section_numbers_signal_blue \
+            tests/test_thesis.py::test_the_script_replots_the_committed_figure_from_the_data | tee out.txt
+          grep -qE "(^|[^0-9])32 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi

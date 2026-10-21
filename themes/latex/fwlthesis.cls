@@ -32,7 +32,11 @@
 \titleformat{\subsection}{\fwlmedium\large\color{fwlHeading}}{\textcolor{fwlAccent}{\thesubsection}}{0.7em}{}
 \titlespacing*{\subsection}{0pt}{1.1em}{0.3em}
 \titleformat{\subsubsection}{\fwlmedium\normalsize\color{fwlHeading}}{\textcolor{fwlAccent}{\thesubsubsection}}{0.7em}{}
-\renewcommand{\tableofcontents}{\section*{\contentsname}\@starttoc{toc}}
+% Contents and lists on their own pages; unnumbered sections after the contents enter it
+\newif\iffwl@listed
+\renewcommand{\tableofcontents}{\section*{\contentsname}\@starttoc{toc}\global\fwl@listedtrue}
+\renewcommand{\listoffigures}{\section*{\listfigurename}\@starttoc{lof}}
+\renewcommand{\listoftables}{\section*{\listtablename}\@starttoc{lot}}
 \renewcommand{\bibsection}{\section*{\refname}}
 
 \DeclareCaptionFont{fwlmuted}{\color{fwlMuted}}
@@ -44,25 +48,27 @@
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\sectionmark}[1]{\markboth{\thesection\quad#1}{}}
-\fancyhead[L]{\ttfamily\footnotesize\color{fwlMuted}\@title}
+\fancyhead[L]{\ttfamily\footnotesize\color{fwlMuted}\fwl@short}
 \fancyhead[R]{\ttfamily\footnotesize\color{fwlMuted}\leftmark}
 \fancyfoot[R]{\ttfamily\footnotesize\color{fwlMuted}\thepage}
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[R]{\ttfamily\footnotesize\color{fwlMuted}\thepage}}
 % Every section opens a new page, also one that follows another heading directly
 \AtBeginDocument{\let\fwl@section\section
   \renewcommand{\section}{\clearpage\@ifstar{\fwl@starred}{\fwl@section}}}
-\newcommand{\fwl@starred}[1]{\fwl@section*{#1}\markboth{#1}{}}
+\newcommand{\fwl@starred}[1]{\fwl@section*{#1}\markboth{#1}{}%
+  \iffwl@listed\addcontentsline{toc}{section}{#1}\fi}
 
 % Title page
-\newcommand{\fwl@degree}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
-\newcommand{\degree}[1]{\renewcommand{\fwl@degree}{#1}}
+\newcommand{\fwl@type}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
+\newcommand{\fwl@short}{\@title}
+\newcommand{\thesistype}[1]{\renewcommand{\fwl@type}{#1}}
+\newcommand{\shorttitle}[1]{\renewcommand{\fwl@short}{#1}}
 \newcommand{\studentnumber}[1]{\renewcommand{\fwl@snum}{#1}}
 \newcommand{\supervisors}[1]{\renewcommand{\fwl@sup}{#1}}
 \renewcommand{\maketitle}{\begin{titlepage}\thispagestyle{empty}%
   \includegraphics[width=\textwidth]{\fwlassetpath rug-banner-ink.png}\par
   \vspace*{5.5cm}
-  {\fwlmedium\small\color{fwlAccent}\MakeUppercase{\fwl@degree}\quad\textperiodcentered\quad
-    \MakeUppercase{Kapteyn Astronomical Institute}\par}\vspace{0.8em}
+  {\fwlmedium\color{fwlAccent}\fwl@type\par}\vspace{0.8em}
   {\raggedright\hyphenpenalty=10000\fwllightface\fontsize{30}{36}\selectfont
     \color{fwlHeading}\@title\par}\vspace{1em}
   {\color{fwlAccent}\rule{3cm}{0.8pt}}\par\vspace{1.2em}

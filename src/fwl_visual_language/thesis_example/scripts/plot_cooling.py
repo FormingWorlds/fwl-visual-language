@@ -24,7 +24,10 @@ def main():
     ax.set_xlabel("Time (Myr)")
     ax.set_ylabel("Surface temperature (K)")
     ax.legend(frameon=False)
-    fig.savefig(HERE / "figures" / "cooling.pdf", metadata={"CreationDate": None})
+    fig.savefig(
+        HERE / "figures" / "cooling.pdf",
+        metadata={"CreationDate": None, "Creator": None, "Producer": None},
+    )
 
 
 if __name__ == "__main__":

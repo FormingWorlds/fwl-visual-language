@@ -2,7 +2,7 @@
 
 The title page carries the banner of the University of Groningen, the Faculty of
 Science and Engineering and the Kapteyn Astronomical Institute in ink, the
-degree line, the title, the author, the student number, the supervisors and the
+thesis type, the title, the author, the student number, the supervisors and the
 lab logo. Every section opens a new page, numbered sections with a large
 signal-blue number. Text is Geist at 11 pt with the lab math (``fwl`` with
 ``math``), citations are author-year (``natbib`` with the AAS style), and
@@ -10,13 +10,14 @@ signal-blue number. Text is Geist at 11 pt with the lab math (``fwl`` with
 
 Grey guidance comes from ``\\guide{text}`` and ``\\guidesection{title}``; the
 class option ``final`` hides all of it. ``\\figuredata{link}`` names the data
-and the script of a figure in its caption. Compile with LuaLaTeX::
+and the script of a figure in its caption. ``\\shorttitle{text}`` sets the title
+in the running head when the full title is too long for it. Compile with LuaLaTeX::
 
     \\documentclass{fwlthesis}
     \\title{Title of the thesis}
     \\author{Firstname Lastname}
     \\studentnumber{s1234567}
-    \\degree{BSc thesis Astronomy}
+    \\thesistype{BSc thesis Astronomy}
     \\supervisors{Supervisor & Prof.~dr.~Name Surname\\\\ Second examiner & Dr.~Name}
     \\date{Month Year}
     \\begin{document}\\maketitle ... \\end{document}
@@ -37,15 +38,30 @@ from datetime import date
 from pathlib import Path
 
 from . import __version__, assets_dir, fonts_dir
-from .beamer import ADS_MACROS, ASSET_DIR
-from .latex import FONT_DIR, install_latex
+from .beamer import ASSET_DIR
+from .latex import ADS_MACROS, FONT_DIR, install_latex
 
-__all__ = ["CLS_NAME", "ZIP_NAME", "build_thesis_zip", "install_thesis", "thesis_cls"]
+__all__ = [
+    "CLS_NAME",
+    "EXAMPLE_FILES",
+    "ZIP_NAME",
+    "build_thesis_zip",
+    "install_thesis",
+    "thesis_cls",
+]
 
 CLS_NAME = "fwlthesis.cls"
 ZIP_NAME = "Forming Worlds Thesis.zip"
 _LOGOS = ("fwl-logo-ink.png", "rug-banner-ink.png")
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
+EXAMPLE_FILES = (
+    "main.tex",
+    "references.bib",
+    "latexmkrc",
+    "data/cooling.csv",
+    "scripts/plot_cooling.py",
+    "figures/cooling.pdf",
+)
 _ZIP_TIME = (2026, 10, 21, 0, 0, 0)
 
 _BODY = r"""\newif\iffwl@final
@@ -79,7 +95,11 @@ _BODY = r"""\newif\iffwl@final
 \titleformat{\subsection}{\fwlmedium\large\color{fwlHeading}}{\textcolor{fwlAccent}{\thesubsection}}{0.7em}{}
 \titlespacing*{\subsection}{0pt}{1.1em}{0.3em}
 \titleformat{\subsubsection}{\fwlmedium\normalsize\color{fwlHeading}}{\textcolor{fwlAccent}{\thesubsubsection}}{0.7em}{}
-\renewcommand{\tableofcontents}{\section*{\contentsname}\@starttoc{toc}}
+% Contents and lists on their own pages; unnumbered sections after the contents enter it
+\newif\iffwl@listed
+\renewcommand{\tableofcontents}{\section*{\contentsname}\@starttoc{toc}\global\fwl@listedtrue}
+\renewcommand{\listoffigures}{\section*{\listfigurename}\@starttoc{lof}}
+\renewcommand{\listoftables}{\section*{\listtablename}\@starttoc{lot}}
 \renewcommand{\bibsection}{\section*{\refname}}
 
 \DeclareCaptionFont{fwlmuted}{\color{fwlMuted}}
@@ -91,25 +111,27 @@ _BODY = r"""\newif\iffwl@final
 \fancyhf{}
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\sectionmark}[1]{\markboth{\thesection\quad#1}{}}
-\fancyhead[L]{\ttfamily\footnotesize\color{fwlMuted}\@title}
+\fancyhead[L]{\ttfamily\footnotesize\color{fwlMuted}\fwl@short}
 \fancyhead[R]{\ttfamily\footnotesize\color{fwlMuted}\leftmark}
 \fancyfoot[R]{\ttfamily\footnotesize\color{fwlMuted}\thepage}
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[R]{\ttfamily\footnotesize\color{fwlMuted}\thepage}}
 % Every section opens a new page, also one that follows another heading directly
 \AtBeginDocument{\let\fwl@section\section
   \renewcommand{\section}{\clearpage\@ifstar{\fwl@starred}{\fwl@section}}}
-\newcommand{\fwl@starred}[1]{\fwl@section*{#1}\markboth{#1}{}}
+\newcommand{\fwl@starred}[1]{\fwl@section*{#1}\markboth{#1}{}%
+  \iffwl@listed\addcontentsline{toc}{section}{#1}\fi}
 
 % Title page
-\newcommand{\fwl@degree}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
-\newcommand{\degree}[1]{\renewcommand{\fwl@degree}{#1}}
+\newcommand{\fwl@type}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
+\newcommand{\fwl@short}{\@title}
+\newcommand{\thesistype}[1]{\renewcommand{\fwl@type}{#1}}
+\newcommand{\shorttitle}[1]{\renewcommand{\fwl@short}{#1}}
 \newcommand{\studentnumber}[1]{\renewcommand{\fwl@snum}{#1}}
 \newcommand{\supervisors}[1]{\renewcommand{\fwl@sup}{#1}}
 \renewcommand{\maketitle}{\begin{titlepage}\thispagestyle{empty}%
   \includegraphics[width=\textwidth]{\fwlassetpath rug-banner-ink.png}\par
   \vspace*{5.5cm}
-  {\fwlmedium\small\color{fwlAccent}\MakeUppercase{\fwl@degree}\quad\textperiodcentered\quad
-    \MakeUppercase{Kapteyn Astronomical Institute}\par}\vspace{0.8em}
+  {\fwlmedium\color{fwlAccent}\fwl@type\par}\vspace{0.8em}
   {\raggedright\hyphenpenalty=10000\fwllightface\fontsize{30}{36}\selectfont
     \color{fwlHeading}\@title\par}\vspace{1em}
   {\color{fwlAccent}\rule{3cm}{0.8pt}}\par\vspace{1.2em}
@@ -165,8 +187,8 @@ def install_thesis(dest, example=False):
     example : bool, optional
         Also write the example thesis: ``main.tex`` with the guidance,
         ``references.bib``, ``latexmkrc``, and the data, script and figure of
-        Figure 1. An existing ``main.tex`` stops the call before anything is
-        written.
+        Figure 1 (:data:`EXAMPLE_FILES`). If any of these files exists, the
+        call stops before anything is written.
 
     Returns
     -------
@@ -176,12 +198,13 @@ def install_thesis(dest, example=False):
     Raises
     ------
     FileExistsError
-        If ``example`` is true and ``dest`` already holds a ``main.tex``.
+        If ``example`` is true and ``dest`` already holds a file of the example.
     """
     dest = Path(dest)
     src = Path(__file__).resolve().parent / "thesis_example"
-    if example and (dest / "main.tex").exists():
-        raise FileExistsError(f"{dest / 'main.tex'} exists; install the example elsewhere")
+    taken = [rel for rel in EXAMPLE_FILES if example and (dest / rel).exists()]
+    if taken:
+        raise FileExistsError(f"{', '.join(taken)} exist in {dest}; install the example elsewhere")
     install_latex(dest)
     for face in _LIGHT:
         shutil.copyfile(fonts_dir() / "ttf" / face, dest / FONT_DIR / face)
@@ -190,11 +213,9 @@ def install_thesis(dest, example=False):
     for logo in _LOGOS:
         shutil.copyfile(assets_dir() / logo, assets / logo)
     if example:
-        for path in sorted(src.rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts:
-                out = dest / path.relative_to(src)
-                out.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(path, out)
+        for rel in EXAMPLE_FILES:
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src / rel, dest / rel)
     out = dest / CLS_NAME
     out.write_text(thesis_cls(), encoding="utf-8")
     return out
@@ -205,7 +226,7 @@ def build_thesis_zip(out):
 
     The archive holds no folder around the files, so Overleaf (New project,
     Upload project) opens ``main.tex`` at its root. Time stamps are fixed, so
-    the same version writes the same archive.
+    the same version writes the same entries with the same contents.
 
     Parameters
     ----------

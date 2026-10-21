@@ -5,7 +5,8 @@
 \title{Title of the thesis}
 \author{Firstname Lastname}
 \studentnumber{s1234567}
-\degree{BSc thesis Astronomy}
+\thesistype{BSc thesis Astronomy}
+% \shorttitle{Short title} % for the running head, when the title is long
 \supervisors{%
   Supervisor & Prof.~dr.~Name Surname\\
   Daily supervisor & Dr.~Name Surname\\
@@ -17,13 +18,13 @@
 
 \guidesection{Using this template}
 \guide{Grey text like this says what goes where. Write your own text below it. The class option \guidecmd{final} hides all grey text at once, so you can keep it while you write. Compile with LuaLaTeX; in Overleaf, set the compiler to LuaLaTeX in the project settings.}
-\guide{\textbf{Citations.} \guidecmd{\textbackslash citet\{key\}} cites in the sentence: \citet{Lichtenberg2021} show that \ldots; \guidecmd{\textbackslash citep\{key\}} cites in parentheses: \ldots{} for millions of years \citep{Lichtenberg2021}. Take the BibTeX entry of each paper from NASA ADS (Export, BibTeX) and keep its key. Cite the journal version once a paper is published, not only the arXiv version. Journal names such as \guidecmd{\textbackslash apj} and \guidecmd{\textbackslash mnras} from ADS work as they are.}
-\guide{\textbf{Code and data.} All code and data of the thesis must be public. Put the code, the data and one plotting script per figure in a GitHub repository, make a release, and archive it on Zenodo, which gives it a DOI. Every figure must be replottable from these files: name its data and script in the caption with \guidecmd{\textbackslash figuredata\{link\}}, as in Figure~\ref{fig:cooling}, which \guidecmd{scripts/plot\_cooling.py} plots from \guidecmd{data/cooling.csv}. Cite the codes and data sets of others that you use, in the form their documentation asks for.}
+\guide{\textbf{Citations.} \guidecmd{\textbackslash citet\{key\}} cites in the sentence: \citet{Lichtenberg2021} show that \ldots; \guidecmd{\textbackslash citep\{key\}} cites in parentheses: \ldots{} \citep{Lichtenberg2021}. Take the BibTeX entry of each paper from NASA ADS (Export, BibTeX) and cite it with the key of its entry. Cite the journal version once a paper is published, not only the arXiv version. The common journal macros of ADS, such as \guidecmd{\textbackslash apj} and \guidecmd{\textbackslash mnras}, are defined.}
+\guide{\textbf{Code and data.} All code and data of the thesis must be public. Put the code, the data, one plotting script per figure and a licence file in a GitHub repository. Connect GitHub to Zenodo and switch the repository on in the GitHub settings of Zenodo, then make a release: Zenodo archives it and gives it a DOI. Every figure must be replottable from these files: name its data and script in the caption with \guidecmd{\textbackslash figuredata\{link\}}, as in Figure~\ref{fig:cooling}, which \guidecmd{scripts/plot\_cooling.py} plots from \guidecmd{data/cooling.csv}; replace the example link with the DOI of your record. A long caption with a link needs a short form for the list of figures: \guidecmd{\textbackslash caption[short]\{long\}}. Cite the codes and data sets of others that you use, in the form their documentation asks for.}
 \guide{\textbf{Figures and units.} Plot with the lab style fwl-mpl, save figures as vector PDF, label every axis with its quantity and unit, and use the colours of the style, which stay apart for readers with colour-vision deficiency. A caption starts with what the figure shows and says how to read it: what one line, dot or colour is, and where to look. Write numbers with units as \guidecmd{\textbackslash qty\{1500\}\{\textbackslash kelvin\}}.}
 \guide{\textbf{Writing.} Give each paragraph one message, stated in its first sentence. Use the present tense for what the thesis shows and the past tense for what you did. Define every symbol where it first appears. Agree on the plan and the length of each section with your supervisor before you write.}
 
 \section*{Abstract}
-\guide{150 to 250 words in 5 labelled parts. Write it last.}
+\guide{A few sentences in each of the 5 labelled parts. Write it last.}
 \textbf{Context.} \guide{The problem and why it matters.}
 \textbf{Aims.} \guide{The question this thesis answers.}
 \textbf{Methods.} \guide{The data, models and codes you used.}
@@ -31,23 +32,24 @@
 \textbf{Conclusions.} \guide{What follows from the results.}
 
 \section*{Samenvatting}
-\guide{The abstract in Dutch, with the same 5 parts.}
+\guide{The abstract in Dutch, with the same 5 parts: Context, Doel, Methode, Resultaten, Conclusies.}
 
 \tableofcontents
 
 \section{Introduction}
 \label{sec:introduction}
 \guide{Start with the scientific context and the open question, with citations to the key papers. Narrow down to the problem of this thesis, state its aim in 1 or 2 sentences, and end with an outline of the next sections.}
+How long the mantle of a young rocky planet stays molten depends on the atmosphere above it \citep{Lichtenberg2021}.
 
 \section{Methods}
 \label{sec:methods}
 \guide{Describe the models, data and codes in enough detail that a reader can reproduce the results: equations with every symbol and unit defined, parameter values (a table helps), and the version of each code. Cite every code and data set you use.}
-Following \citet{Lichtenberg2021}, the surface radiates
+The surface radiates as a grey body,
 \begin{equation}
 F = \varepsilon\,\sigma T_\mathrm{s}^4 ,
 \label{eq:flux}
 \end{equation}
-with $\varepsilon$ the emissivity, $\sigma$ the Stefan--Boltzmann constant and $T_\mathrm{s}$ the surface temperature, here $T_\mathrm{s} = \qty{1500}{\kelvin}$ at the start.
+with $F$ the emitted flux per unit area, $\varepsilon$ the emissivity, $\sigma$ the Stefan-Boltzmann constant and $T_\mathrm{s}$ the surface temperature, which starts at \qty{3000}{\kelvin}.
 
 \section{Results}
 \label{sec:results}
@@ -56,7 +58,7 @@ Figure~\ref{fig:cooling} shows the surface temperature of 3 cases.
 \begin{figure}[ht]
   \centering
   \includegraphics[width=0.75\textwidth]{figures/cooling.pdf}
-  \caption{Surface temperature against time for 3 example cases. Each line is one model run.%
+  \caption[Surface temperature against time]{Surface temperature against time for 3 example cases. Each line is one model run; case 3 cools slowest.%
     \figuredata{https://doi.org/10.5281/zenodo.0000000}}
   \label{fig:cooling}
 \end{figure}
