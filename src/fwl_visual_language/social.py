@@ -49,6 +49,7 @@ INK = ramp("ink")
 SIGNAL = ramp("signal")
 MARGIN = 48
 MONO_MIN = 20  # smallest px of a reference line that shrinks to fit
+CAPTION_PX, CAPTION_LEAD, CAPTION_LINES = 30, 1.3, 4
 STATUS = {"submitted": "Submitted to", "accepted": "Accepted to", "published": "Published in"}
 _CMAPS = {}
 
@@ -73,23 +74,30 @@ def ref_line(ref, status=None, journal=None):
     Raises
     ------
     ValueError
-        If only one of ``status`` and ``journal`` is given, or ``status`` is unknown.
+        If ``ref`` is empty, only one of ``status`` and ``journal`` is given, a
+        status is not one of the 3, or a journal is blank. An empty or missing
+        status and journal both mean no status.
     """
-    if status is None and journal is None:
+    if not isinstance(ref, str) or not ref.strip():
+        raise ValueError("a card text is empty: the reference")
+    if not status and not journal:
         return ref
-    if not status or not journal:
+    if not isinstance(status, str) or not isinstance(journal, str) or not journal.strip():
         raise ValueError("a status needs a journal and a journal needs a status")
     if status.lower() not in STATUS:
         raise ValueError(f"unknown status {status!r}; statuses: {', '.join(STATUS)}")
-    return f"{ref} · {STATUS[status.lower()]} {journal}"
+    return f"{ref} · {STATUS[status.lower()]} {journal.strip()}"
 
 
 def _missing(name, text):
     """Return the characters of ``text`` that the font file ``name`` has no glyph for."""
     if name not in _CMAPS:
-        from fontTools.ttLib import TTFont
-
-        _CMAPS[name] = set(TTFont(fonts_dir() / "ttf" / f"{name}.ttf").getBestCmap())
+        try:
+            from fontTools.ttLib import TTFont
+        except ImportError:  # without fontTools the cards draw, unchecked
+            return []
+        with TTFont(fonts_dir() / "ttf" / f"{name}.ttf") as font:
+            _CMAPS[name] = set(font.getBestCmap())
     return sorted({ch for ch in text if not ch.isspace() and ord(ch) not in _CMAPS[name]})
 
 
@@ -213,13 +221,14 @@ class _Card:
         return y / self.s
 
     def fit(self, xy, text, face, px, fill, width):
-        """Draw 1 line, from ``px`` down to :data:`MONO_MIN` px until it fits ``width``."""
+        """Draw 1 line at the largest size from ``px`` to :data:`MONO_MIN` that fits ``width``."""
         if not text.strip():
             raise ValueError("a card text is empty")
+        line = " ".join(text.split())  # as block() draws it
         for size in range(px, MONO_MIN - 1, -1):
-            if self.d.textlength(text, font=self.font(face, size)) <= self.u(width):
-                return self.block(xy, text, face, size, fill, width, 1, 1)
-        raise ValueError(f"the text holds 1 line even at {MONO_MIN} px: {text[:40]!r}")
+            if self.d.textlength(line, font=self.font(face, size)) <= self.u(width):
+                return self.block(xy, line, face, size, fill, width, 1, 1)
+        raise ValueError(f"the text does not fit 1 line even at {MONO_MIN} px: {text[:40]!r}")
 
     def right(self, x_end, y, text, face, px, fill, width):
         """Draw 1 line that ends at design ``x_end``; refuse it when wider than ``width``."""
@@ -241,19 +250,20 @@ class _Card:
             self.d.text((x, self.u(xy[1])), ch, font=font, fill=SIGNAL["400"])
             x += self.d.textlength(ch, font=font) + self.u(3)
 
-    @staticmethod
-    def logo_room(margin, height, gap=32):
-        """Return the design width from ``margin`` to ``gap`` px before a right-hand logo."""
-        from PIL import Image
+    def logo_width(self, height):
+        """Return the drawn width in px of the logo at design ``height``."""
+        with self.Image.open(assets_dir() / "fwl-logo-white.png") as lg:
+            return round(lg.width * self.u(height) / lg.height)
 
-        with Image.open(assets_dir() / "fwl-logo-white.png") as lg:
-            width = lg.width * height / lg.height
-        return SIZE - 2 * margin - width - gap
+    def logo_room(self, margin, height, gap=32):
+        """Return the design width from ``margin`` to ``gap`` px before a right-hand logo."""
+        return SIZE - 2 * margin - self.logo_width(height) / self.s - gap
 
     def logo(self, xy, height=60, right=True):
-        lg = self.Image.open(assets_dir() / "fwl-logo-white.png").convert("RGBA")
+        with self.Image.open(assets_dir() / "fwl-logo-white.png") as img:
+            lg = img.convert("RGBA")
         h = self.u(height)
-        lg = lg.resize((round(lg.width * h / lg.height), h), self.Image.LANCZOS)
+        lg = lg.resize((self.logo_width(height), h), self.Image.LANCZOS)
         x = self.size - self.u(xy[0]) - lg.width if right else self.u(xy[0])
         self.im.alpha_composite(lg, (x, self.u(xy[1])))
 
@@ -351,7 +361,7 @@ def paper_card(out, photo, title, authors, lab=(), label="New paper", focus=(0.5
     return c.save(out)
 
 
-def glance_card(out, text, ref, label="At a glance", status=None, journal=None, size=SIZE):
+def glance_card(out, text, ref, label="At a glance", size=SIZE, *, status=None, journal=None):
     """Write the summary card: a label, the plain-language summary and the reference.
 
     Parameters
@@ -385,17 +395,19 @@ def glance_card(out, text, ref, label="At a glance", status=None, journal=None, 
     c.block((64, 118), text, "Regular", 41, INK["100"], SIZE - 128, 1.36, 15)
     ref = ref_line(ref, status, journal)
     c.fit((64, SIZE - 96), ref, "mono", 28, INK["400"], c.logo_room(64, 60))
-    c.logo((64, SIZE - 112))
+    c.logo((64, SIZE - 112), 60)
     return c.save(out)
 
 
 def figure_card(
-    out, figure, headline, source, ref, caption=None, status=None, journal=None, size=SIZE
+    out, figure, headline, source, ref, size=SIZE, *, caption=None, status=None, journal=None
 ):
-    """Write the figure card: headline, the figure on a white panel, source and reference.
+    """Write the figure card: headline, the figure, an optional caption, source and reference.
 
     With a caption, the caption sits under the panel and the source under the caption,
-    and the figure gets less height.
+    and the figure gets less height: its budget ends 140 px above the foot, less the
+    caption height, against 150 px without a caption, since the 26 px of gaps
+    (18 + 8) and the smaller source line fit in 36 px plus those 10 px.
 
     Parameters
     ----------
@@ -437,11 +449,13 @@ def figure_card(
     h = round(fig.height * w / fig.width)
     room = c.u(SIZE - 150) - c.u(top) - c.u(2 * pad)
     if caption is not None:
-        rows = c.lines(caption, c.font("Regular", 30), c.u(SIZE - 2 * MARGIN))
-        if len(rows) > 4:
-            raise ValueError(f"text needs {len(rows)} lines, the card holds 4: {caption[:40]!r}")
-        # the caption, its gaps and the smaller source take this height from the figure
-        room = c.u(SIZE - 140 - (36 + 30 * 1.3 * len(rows))) - c.u(top) - c.u(2 * pad)
+        rows = c.lines(caption, c.font("Regular", CAPTION_PX), c.u(SIZE - 2 * MARGIN))
+        if len(rows) > CAPTION_LINES:
+            raise ValueError(
+                f"text needs {len(rows)} lines, the card holds {CAPTION_LINES}: {caption[:40]!r}"
+            )
+        caption_h = 36 + CAPTION_PX * CAPTION_LEAD * len(rows)
+        room = c.u(SIZE - 140 - caption_h) - c.u(top) - c.u(2 * pad)
     if h > room:
         raise ValueError(f"the figure needs {h} px of height, the card has {room}")
     fig = fig.resize((w, h), c.Image.LANCZOS)
@@ -468,11 +482,11 @@ def figure_card(
             (MARGIN, bottom / c.s + 18),
             caption,
             "Regular",
-            30,
+            CAPTION_PX,
             INK["100"],
             SIZE - 2 * MARGIN,
-            1.3,
-            4,
+            CAPTION_LEAD,
+            CAPTION_LINES,
         )
         c.block((MARGIN, y + 8), source, "Regular", 26, INK["300"], SIZE - 2 * MARGIN - 130, 1, 1)
     c.fit((MARGIN, SIZE - 76), ref, "mono", 26, INK["300"], c.logo_room(MARGIN, 52))
@@ -480,7 +494,9 @@ def figure_card(
     return c.save(out)
 
 
-def cover_card(out, question, lead, ref, label="New paper", status=None, journal=None, size=SIZE):
+def cover_card(
+    out, question, lead, ref, label="New paper", size=SIZE, *, status=None, journal=None
+):
     """Write the carousel cover: the question a paper answers, in Geist Light.
 
     Parameters
@@ -517,7 +533,7 @@ def cover_card(out, question, lead, ref, label="New paper", status=None, journal
     c.block((64, SIZE - 160), lead, "Regular", 32, INK["300"], SIZE - 128 - 180, 1.2, 1)
     ref = ref_line(ref, status, journal)
     c.fit((64, SIZE - 112), ref, "mono", 28, INK["300"], c.logo_room(64, 60))
-    c.logo((64, SIZE - 124))
+    c.logo((64, SIZE - 124), 60)
     return c.save(out)
 
 
@@ -702,7 +718,8 @@ def render(spec, folder):
         Before any card is written: if ``cards`` is missing, an entry lacks
         ``card`` or ``file``, a card name is unknown, a file stem holds a path
         separator, or 2 stems differ only in case. While writing: if a card
-        refuses its texts or images.
+        refuses its texts or images. A card that draws a character Geist has no
+    glyph for gives a warning that names the card.
     """
     import inspect
 
@@ -745,7 +762,11 @@ def render(spec, folder):
         for key in ("entries", "focus", "box"):
             if key in args:
                 args[key] = [tuple(e) for e in args[key]] if key == "entries" else tuple(args[key])
-        written.append(CARDS[kind](Path(folder) / f"{stem}.png", **args))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            written.append(CARDS[kind](Path(folder) / f"{stem}.png", **args))
+        for w in caught:  # name the card in each warning
+            warnings.warn(f"card {stem!r}: {w.message}", w.category, stacklevel=2)
     return written
 
 

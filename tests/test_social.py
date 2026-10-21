@@ -287,11 +287,14 @@ def test_the_author_line_holds_2_lines(tmp_path, photo):
 @pytest.mark.parametrize(
     "make, match",
     [
-        (lambda o, f, p: social.glance_card(o, "t", "ref " * 30), "holds 1"),
-        (lambda o, f, p: social.cover_card(o, "Q", "Lead", "ref " * 30), "holds 1"),
+        (lambda o, f, p: social.glance_card(o, "t", "ref " * 30), "fit 1 line even at 20"),
+        (lambda o, f, p: social.cover_card(o, "Q", "Lead", "ref " * 30), "fit 1 line even at 20"),
         (lambda o, f, p: social.cover_card(o, "Q", "Lead " * 20, "ref"), "holds 1"),
         (lambda o, f, p: social.figure_card(o, f, "H", "Source " * 30, "ref"), "holds 1"),
-        (lambda o, f, p: social.figure_card(o, f, "H", "Source", "ref " * 30), "holds 1"),
+        (
+            lambda o, f, p: social.figure_card(o, f, "H", "Source", "ref " * 30),
+            "fit 1 line even at 20",
+        ),
         (lambda o, f, p: social.glance_card(o, "t", "ref", label="label " * 20), "label is wider"),
         (
             lambda o, f, p: social.event_card(o, "E", "W", "H", [("A", "detail " * 20)]),
@@ -485,8 +488,8 @@ def test_the_module_runs_as_a_script(tmp_path, monkeypatch):
 CAPTION = "Each dot is one model run; blue runs keep more than 0.1 bar of atmosphere."
 
 
-def old_figure_card(out, figure, headline, source, ref):
-    """The figure card as it was before captions, to compare the output pixel by pixel."""
+def reference_figure_card(out, figure, headline, source, ref):
+    """A frozen copy of the figure card without a caption, as a pixel reference."""
     c = social._Card(1080)
     y = c.block((48, 48), headline, "SemiBold", 46, INK["0"], 1080 - 96, 1.12, 2)
     pad, top = 16, y + 22
@@ -512,9 +515,9 @@ def pixels(path):
     return np.asarray(Image.open(path).convert("RGB")).tolist()
 
 
-def test_a_figure_card_without_caption_matches_the_card_before_captions(tmp_path, figure):
+def test_a_figure_card_without_caption_matches_the_frozen_reference(tmp_path, figure):
     args = (figure, "A headline over two words", "Source, Fig. 2", "arXiv:0000.00000")
-    old = old_figure_card(tmp_path / "old.png", *args)
+    old = reference_figure_card(tmp_path / "old.png", *args)
     new = social.figure_card(tmp_path / "new.png", *args)
     none = social.figure_card(tmp_path / "none.png", *args, caption=None)
     assert pixels(new) == pixels(old) == pixels(none)
@@ -643,7 +646,7 @@ def test_a_long_reference_shrinks_to_the_largest_size_that_fits(
     c = social._Card(1080)
     assert c.d.textlength(LONG_REF, font=c.font("mono", long_px)) <= c.u(width)
     assert c.d.textlength(LONG_REF, font=c.font("mono", long_px + 1)) > c.u(width)
-    with pytest.raises(ValueError, match="holds 1 line even at 20 px"):
+    with pytest.raises(ValueError, match="does not fit 1 line even at 20 px"):
         make(tmp_path / "no.png", figure, LONG_REF * 2)
 
 
@@ -699,3 +702,186 @@ def test_render_warns_for_a_missing_glyph_in_a_spec(tmp_path):
 def test_an_empty_reference_is_refused(tmp_path, ref):
     with pytest.raises(ValueError, match="empty"):
         social.glance_card(tmp_path / "g.png", "T", ref)
+
+
+def reference_glance_card(out, text, ref):
+    """A frozen copy of the glance card with a reference that fits, as a pixel reference."""
+    c = social._Card(1080)
+    c.label((64, 64), "At a glance", 28)
+    c.block((64, 118), text, "Regular", 41, INK["100"], 1080 - 128, 1.36, 15)
+    c.block((64, 1080 - 96), ref, "mono", 28, INK["400"], 1080 - 128 - 180, 1, 1)
+    c.logo((64, 1080 - 112))
+    return c.save(out)
+
+
+def reference_cover_card(out, question, lead, ref):
+    """A frozen copy of the cover card with a reference that fits, as a pixel reference."""
+    c = social._Card(1080)
+    c.label((64, 110), "New paper", 28)
+    y = c.block((64, 160), question, "Light", 86, INK["0"], 1080 - 128, 1.08, 6)
+    c.d.rectangle((c.u(64), c.u(y + 30), c.u(174), c.u(y + 36)), fill=SIGNAL["400"])
+    c.block((64, 1080 - 160), lead, "Regular", 32, INK["300"], 1080 - 128 - 180, 1.2, 1)
+    c.block((64, 1080 - 112), ref, "mono", 28, INK["300"], 1080 - 128 - 180, 1, 1)
+    c.logo((64, 1080 - 124))
+    return c.save(out)
+
+
+def test_glance_and_cover_cards_with_a_short_reference_match_the_frozen_references(tmp_path):
+    ref = "arXiv:2609.20155"
+    a = social.glance_card(tmp_path / "g.png", "H₂O and S₂ outgas.", ref)
+    b = reference_glance_card(tmp_path / "g0.png", "H₂O and S₂ outgas.", ref)
+    assert pixels(a) == pixels(b)
+    a = social.cover_card(tmp_path / "c.png", "Can a world keep its air?", "Led by A", ref)
+    b = reference_cover_card(tmp_path / "c0.png", "Can a world keep its air?", "Led by A", ref)
+    assert pixels(a) == pixels(b)
+
+
+def test_size_stays_the_positional_argument_after_the_reference(tmp_path, figure):
+    assert Image.open(social.glance_card(tmp_path / "g.png", "T", "r", "Label", 540)).size == (
+        540,
+        540,
+    )
+    assert Image.open(social.cover_card(tmp_path / "c.png", "Q", "L", "r", "Label", 540)).size == (
+        540,
+        540,
+    )
+    assert Image.open(social.figure_card(tmp_path / "f.png", figure, "H", "S", "r", 540)).size == (
+        540,
+        540,
+    )
+
+
+@pytest.mark.parametrize(
+    "ref, status, journal, match",
+    [
+        ("", None, None, "empty"),
+        ("  ", "accepted", "ApJ", "empty"),
+        ("arXiv:1", "accepted", "   ", "needs a journal"),
+        ("arXiv:1", 3, "ApJ", "needs a journal"),
+    ],
+)
+def test_the_reference_line_refuses_an_empty_reference_or_journal(ref, status, journal, match):
+    with pytest.raises(ValueError, match=match):
+        social.ref_line(ref, status, journal)
+
+
+def test_an_empty_status_and_journal_mean_no_status():
+    assert social.ref_line("arXiv:1", "", "") == "arXiv:1"
+
+
+def origins(monkeypatch):
+    """Record the origin of every text draw as (x, y, text)."""
+    calls = []
+    real = ImageDraw.ImageDraw.text
+
+    def spy(self, xy, text, *a, **kw):
+        calls.append((xy[0], xy[1], text))
+        return real(self, xy, text, *a, **kw)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, "text", spy)
+    return calls
+
+
+def test_the_caption_rows_and_the_source_keep_the_brief_spacing(tmp_path, monkeypatch):
+    figure = tmp_path / "fig.png"
+    Image.new("RGB", (952, 300), (200, 30, 30)).save(figure)  # 300 px high on the card
+    calls = origins(monkeypatch)
+    caption = fill_to(3, "word ", breaker("Regular", 30, 1080 - 96))
+    social.figure_card(tmp_path / "f.png", figure, "H", "Source", "ref", caption=caption)
+    rows = [y for _, y, t in calls if t.startswith("word")]
+    (source_y,) = [y for _, y, t in calls if t == "Source"]
+    top = 48 + round(46 * 1.12) + 22  # under 1 headline line
+    panel_bottom = top + 16 + 300 + 16
+    assert rows == [panel_bottom + 18, panel_bottom + 18 + 39, panel_bottom + 18 + 78]
+    assert source_y == rows[-1] + 39 + 8
+
+
+@pytest.mark.parametrize("lines, fits", [(4, 594), (2, 672)])
+def test_the_caption_takes_its_height_from_the_figure_budget(tmp_path, lines, fits):
+    caption = fill_to(lines, "word ", breaker("Regular", 30, 1080 - 96))
+    top = 48 + round(46 * 1.12) + 22
+    assert fits == round(1080 - 140 - (36 + 30 * 1.3 * lines)) - top - 32  # the brief's budget
+    for h, ok in ((fits, True), (fits + 1, False)):
+        figure = tmp_path / f"fig{h}.png"
+        Image.new("RGB", (952, h), (200, 30, 30)).save(figure)  # h px high on the card
+        if ok:
+            social.figure_card(tmp_path / "f.png", figure, "H", "S", "r", caption=caption)
+        else:
+            with pytest.raises(ValueError, match="px of height"):
+                social.figure_card(tmp_path / "f.png", figure, "H", "S", "r", caption=caption)
+
+
+def test_a_reference_shrinks_down_to_20_px_and_no_further(tmp_path, monkeypatch):
+    c = social._Card(1080)
+    room = c.logo_room(64, 60)
+    assert room == 1080 - 128 - round(1200 * 60 / 662) - 32
+    n = 1
+    while c.d.textlength("x" * (n + 1), font=c.font("mono", 20)) <= c.u(room):
+        n += 1
+    edge = "x" * n  # fits at 20 px, not at 21 px
+    assert c.d.textlength(edge, font=c.font("mono", 21)) > c.u(room)
+    sizes = []
+    real = social._Card.block
+
+    def spy(self, xy, text, face, px, *a):
+        if face == "mono":
+            sizes.append(px)
+        return real(self, xy, text, face, px, *a)
+
+    monkeypatch.setattr(social._Card, "block", spy)
+    social.glance_card(tmp_path / "g.png", "T", edge)
+    assert sizes == [20]
+    with pytest.raises(ValueError, match="even at 20 px"):
+        social.glance_card(tmp_path / "h.png", "T", edge + "x")
+
+
+def test_a_reference_with_extra_spaces_is_measured_as_it_is_drawn(tmp_path, monkeypatch):
+    ref = "arXiv:2609.20155 ·" + " " * 30 + "Accepted to ApJ"  # 34 characters once joined
+    sizes = []
+    real = social._Card.block
+
+    def spy(self, xy, text, face, px, *a):
+        if face == "mono":
+            sizes.append((text, px))
+        return real(self, xy, text, face, px, *a)
+
+    monkeypatch.setattr(social._Card, "block", spy)
+    social.glance_card(tmp_path / "g.png", "T", ref)
+    assert sizes == [("arXiv:2609.20155 · Accepted to ApJ", 28)]
+
+
+def test_a_spec_takes_a_caption(tmp_path, figure, drawn):
+    spec = {"base": str(tmp_path), "cards": [
+        {"card": "figure", "file": "f", "figure": figure.name, "headline": "H", "source": "S",
+         "ref": "r", "caption": "Each bar is one gas."},
+    ]}  # fmt: skip
+    social.render(spec, tmp_path / "out")
+    assert "Each bar is one gas." in {t for _, t, _ in drawn}
+
+
+def test_a_caption_card_at_540_px_keeps_its_texts_off_the_logo(tmp_path, figure, drawn):
+    social.figure_card(tmp_path / "f.png", figure, "H", "Source", LONG_REF, 540, caption=CAPTION)
+    logo = logo_box(540, 48, 984, 52)
+    assert not any(overlaps(b, logo) for b, _, _ in drawn)
+    assert {CAPTION.split()[0]} <= {t.split()[0] for _, t, _ in drawn}
+
+
+@pytest.mark.parametrize("face", ["Regular", "SemiBold", "Light", "Medium", "mono"])
+def test_every_face_has_the_subscript_digits_and_lacks_eta(face):
+    name = social._Card.name(face)
+    assert social._missing(name, "H₀₁₂₃₄₅₆₇₈₉ · é") == []
+    assert social._missing(name, "η⁻") == ["η", "⁻"]
+
+
+def test_without_fonttools_the_cards_draw_without_a_glyph_check(tmp_path, monkeypatch, recwarn):
+    monkeypatch.setitem(sys.modules, "fontTools", None)
+    monkeypatch.setitem(sys.modules, "fontTools.ttLib", None)
+    monkeypatch.setattr(social, "_CMAPS", {})
+    social.glance_card(tmp_path / "g.png", "η matters", "r")
+    assert [w for w in recwarn if "no glyph" in str(w.message)] == []
+
+
+def test_render_names_the_card_in_a_glyph_warning(tmp_path):
+    spec = {"cards": [{"card": "glance", "file": "eta-card", "text": "η matters", "ref": "r"}]}
+    with pytest.warns(UserWarning, match="card 'eta-card': Geist-Regular has no glyph for η"):
+        social.render(spec, tmp_path)
