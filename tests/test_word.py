@@ -277,6 +277,30 @@ def test_a_missing_python_docx_names_the_extra(tmp_path, monkeypatch):
         word.build_word(tmp_path)
 
 
+def test_the_command_line_takes_face_all_for_both_faces(tmp_path):
+    word.main([str(tmp_path / "all"), "--face", "all", "--docx"])
+    names = sorted(p.name for p in (tmp_path / "all").iterdir())
+    assert names == sorted(
+        f"{word.template_name(k, f)}.docx" for f in word.FACES for k in word.KINDS
+    )
+
+
+def test_the_word_university_letter_footer_runs_logo_tab_number(built):
+    feet = footers(built["university-letter", "geist"])
+    assert len(feet) == 2
+    for f in feet:
+        (p,) = f.findall("w:p", NS)
+        kinds = []
+        for c in p:
+            if c.tag == f"{W}fldSimple":
+                kinds.append("page")
+            elif c.tag == f"{W}r" and c.find(".//{*}blip") is not None:
+                kinds.append("logo")
+            elif c.tag == f"{W}r" and c.find("w:tab", NS) is not None:
+                kinds.append("tab")
+        assert kinds == ["logo", "tab", "page"]
+
+
 def test_command_line_and_module_run(tmp_path, capsys, monkeypatch):
     word.main([str(tmp_path / "cli"), "--face", "aptos", "--docx"])
     out = capsys.readouterr().out.split("\n")
@@ -733,6 +757,10 @@ def test_google_docs_headings_have_no_numbers_and_heading_1_is_signal_blue(gdocs
         ids = {a.get(f"{W}abstractNumId") for a in numbering.findall("w:abstractNum", NS)}
         nums = {n.get(f"{W}numId") for n in numbering.findall("w:num", NS)}
         assert {"91", "92"} <= ids and "90" not in ids and "90" not in nums, kind
+        links = {
+            n.get(f"{W}numId"): val(n, "abstractNumId") for n in numbering.findall("w:num", NS)
+        }
+        assert (links["91"], links["92"]) == ("91", "92"), kind
     word_ids = part(built["report", "geist"], "word/numbering.xml").findall("w:abstractNum", NS)
     assert "90" in {a.get(f"{W}abstractNumId") for a in word_ids}
     hb = style(gdocs["handbook"], "Heading1")
@@ -803,6 +831,8 @@ def test_the_google_docs_memo_tables_have_fixed_text_width(gdocs, built):
     filler = kids[first + 1]  # Google Docs joins adjacent tables
     assert [c.tag for c in kids[first : first + 3]] == [f"{W}tbl", f"{W}p", f"{W}tbl"]
     assert "".join(filler.itertext()) == "" and val(filler, "pStyle") == "Sender"
+    word_memo = part(built["memo", "geist"], "word/document.xml").find(".//w:tbl", NS)
+    assert word_memo.find("w:tblPr/w:tblW", NS).get(f"{W}type") == "auto"
 
 
 def test_the_google_docs_letter_header_table_has_fixed_halves(gdocs, built):
@@ -823,8 +853,6 @@ def test_the_google_docs_letter_header_table_has_fixed_halves(gdocs, built):
         ]
     (word_table,) = [t for h in hdrs for t in h.findall("w:tbl", NS)]
     assert word_table.find("w:tblPr/w:tblLayout", NS) is None
-    word_memo = part(built["memo", "geist"], "word/document.xml").find(".//w:tbl", NS)
-    assert word_memo.find("w:tblPr/w:tblW", NS).get(f"{W}type") == "auto"
 
 
 def test_the_google_docs_handbook_asks_for_google_contents_not_a_field(gdocs):
@@ -833,8 +861,11 @@ def test_the_google_docs_handbook_asks_for_google_contents_not_a_field(gdocs):
     assert doc.find(".//w:fldChar", NS) is None and doc.find(".//w:instrText", NS) is None
     body = texts(path)
     assert "Insert > Table of contents" in body and "Update Field" not in body
-    (hint,) = [p for p in doc.iter(f"{W}p") if "Insert > Table" in "".join(p.itertext())]
-    assert hint.find("w:r/w:br", NS).get(f"{W}type") == "page"
+    paras = list(doc.find("w:body", NS).iterfind("w:p", NS))
+    lines = ["".join(p.itertext()) for p in paras]
+    at = lines.index("Choose Insert > Table of contents to list the chapters here.")
+    assert (lines[at - 1], lines[at + 1]) == ("Contents", "Chapter")
+    assert paras[at].find("w:r/w:br", NS).get(f"{W}type") == "page"
     for words in ("Handbook", "Contents", "Chapter", "A note that stands out", "A sub-step."):
         assert words in body
     assert body.index("Contents") < body.index("Chapter")

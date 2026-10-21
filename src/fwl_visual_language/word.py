@@ -189,7 +189,7 @@ class _Builder:
         from docx.shared import Twips
 
         total = self.Cm(TEXT_W).twips
-        a = self.Cm(first).twips if first else total // 2
+        a = total // 2 if first is None else self.Cm(first).twips
         table.autofit = False
         tblw = table._tbl.tblPr.find(self.qn("w:tblW"))
         tblw.set(self.qn("w:type"), "dxa")
@@ -546,8 +546,9 @@ class _Builder:
         rows.autofit = False
         if self.gdocs:
             self.full_width(rows, 2.4)
-        for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
-            col.width = self.Cm(w)
+        else:
+            for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
+                col.width = self.Cm(w)
         for i, (k, v) in enumerate(
             (
                 ("To", "Lab members"),
@@ -562,7 +563,8 @@ class _Builder:
             r = b.add_run(v)
             if k == "Subject":
                 r.font.name = self.f["medium"]
-            rows.cell(i, 0).width, rows.cell(i, 1).width = self.Cm(2.4), self.Cm(TEXT_W - 2.4)
+            if not self.gdocs:
+                rows.cell(i, 0).width, rows.cell(i, 1).width = self.Cm(2.4), self.Cm(TEXT_W - 2.4)
         rule = self.para()
         self.border(rule._p.get_or_add_pPr(), "bottom", _hex("ink", "300"), 4)
         self.para("Text of the memo.")
@@ -743,8 +745,8 @@ def build_gdocs(folder, kinds=KINDS):
 
     They differ from the Word templates where Google Docs differs from Word:
     headings carry no numbers and Heading 1 is signal blue, footers hold no tab
-    stops (text and page number sit at the right; the university letter puts its
-    logo and number in a table), the memo tables have fixed widths, and the
+    characters (text and page number sit at the right; the university letter puts
+    its logo and number in a table), every table has fixed column widths, and the
     handbook asks for Google's own table of contents instead of a Word field.
 
     Parameters

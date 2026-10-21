@@ -76,16 +76,17 @@ In Word for Mac, export a Geist document to PDF with *Best for printing*. The ot
 python -m fwl_visual_language.word templates --gdocs
 ```
 
-The command writes the same 5 kinds as Geist `.docx` files made for Google Docs, `Forming Worlds Letter (Google Docs).docx` and so on; the built files are in `templates/`. Google Docs has Geist, and the PDF export of a converted file embeds it. The files differ from the Word templates where a converted file differs from its Word source:
+The command writes the same 5 kinds as Geist `.docx` files made for Google Docs, `Forming Worlds Letter (Google Docs).docx` and so on; the built files are in `templates/`. Google Docs has Geist, and the PDF export of a converted file embeds it. The files differ from the Word templates where a converted Word template lost part of its look:
 
-- Headings have no numbers, because the conversion drops them; Heading 1 is signal blue instead.
-- Footers hold no tab characters, because the converted footer loses the right tab stop: the footer text and the page number sit together at the right. The university letter puts the lab logo and the page number in a table without borders.
-- The memo has an empty line between its 2 tables, because the conversion joins adjacent tables into one. The tables of all kinds have fixed column widths, because the conversion splits a table without them into equal columns.
+- Headings have no numbers, because the converted heading styles carry none; Heading 1 is signal blue instead.
+- Footers hold no tab characters, because the converted footer lost its right tab stop: the footer text and the page number sit together at the right. The university letter puts the lab logo and the page number in a table without borders.
+- The memo has an empty line between its 2 tables, because the conversion joined the adjacent tables into one.
+- Every table has fixed column widths; a converted memo table without them came out in equal columns.
 - The handbook asks for Google's own table of contents (Insert > Table of contents) instead of a Word contents field.
 
-After the conversion, the styles Normal text, Title, Subtitle and Heading 1 to 3 hold the lab fonts, sizes and colours, so text typed in them keeps the lab look. The other styles of the Word templates (Caption, List Bullet, Note, Key word, Sender and the rest) do not become Google Docs styles: their sample text keeps its look, and the Paint format tool in the toolbar copies that look to new text.
+After the conversion, the styles Normal text, Title, Subtitle and Heading 1 to 3 hold the lab fonts, sizes and colours. No other style of the Word templates (Caption, List Bullet, Note, Key word, Sender and the others) becomes a Google Docs style; its sample text keeps its look, so copy a sample paragraph to reuse that look.
 
-The lab's converted templates are Google Docs in the Forming Worlds Lab Drive folder FWL Templates; to start a document, open one and choose File > Make a copy. To convert a file yourself, upload it to Google Drive, open it with Google Docs and choose File > Save as Google Docs.
+Lab members find the converted templates as Google Docs in the lab's shared Drive folder FWL Templates; to start a document, open one and choose File > Make a copy. To convert a file yourself, upload it to Google Drive, open it with Google Docs and choose File > Save as Google Docs.
 
 ## Posters
 
