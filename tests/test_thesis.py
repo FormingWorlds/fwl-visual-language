@@ -87,12 +87,23 @@ def test_install_with_the_example_copies_every_example_file(tmp_path):
     )
     for rel in files:
         assert filecmp.cmp(EXAMPLE / rel, tmp_path / "t" / rel, shallow=False), rel
-    (EXAMPLE / ".stray-test-file").write_text("x")  # a dot file in the package is not copied
-    try:
-        thesis.install_thesis(tmp_path / "u", example=True)
-    finally:
-        (EXAMPLE / ".stray-test-file").unlink()
-    assert not (tmp_path / "u" / ".stray-test-file").exists()
+
+
+def test_install_copies_no_stray_file_of_the_package(tmp_path, monkeypatch):
+    package = tmp_path / "package"
+    shutil.copytree(
+        EXAMPLE, package / "thesis_example", ignore=shutil.ignore_patterns("__pycache__")
+    )
+    (package / "thesis_example" / ".DS_Store").write_text("finder")
+    (package / "thesis_example" / "data" / "notes.txt").write_text("not in the example")
+    monkeypatch.setattr(thesis, "__file__", str(package / "thesis.py"))
+    thesis.install_thesis(tmp_path / "u", example=True)
+    copied = sorted(
+        p.relative_to(tmp_path / "u").as_posix()
+        for p in (tmp_path / "u").rglob("*")
+        if p.is_file() and not p.relative_to(tmp_path / "u").parts[0].startswith("fwl")
+    )
+    assert copied == sorted(thesis.EXAMPLE_FILES)
 
 
 @pytest.mark.parametrize("rel", ["main.tex", "references.bib", "data/cooling.csv"])
@@ -100,12 +111,24 @@ def test_install_refuses_to_overwrite_any_file_of_a_thesis(tmp_path, rel):
     dest = tmp_path / "t"
     (dest / rel).parent.mkdir(parents=True)
     (dest / rel).write_text("mine")
-    with pytest.raises(FileExistsError, match=f"{rel} exist in"):
+    with pytest.raises(FileExistsError, match=f"already in {re.escape(str(dest))}: {rel};"):
         thesis.install_thesis(dest, example=True)
     assert sorted(p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file()) == [rel]
     assert (dest / rel).read_text() == "mine"
     thesis.install_thesis(dest)  # without the example nothing of the thesis is touched
     assert (dest / rel).read_text() == "mine"
+
+
+def test_install_refuses_a_file_where_the_example_needs_a_folder(tmp_path, capsys):
+    dest = tmp_path / "t"
+    dest.mkdir()
+    (dest / "data").write_text("a file named data")
+    with pytest.raises(FileExistsError, match="data/cooling.csv"):
+        thesis.install_thesis(dest, example=True)
+    assert [p.name for p in dest.iterdir()] == ["data"]
+    with pytest.raises(SystemExit) as err:
+        thesis.main([str(dest), "--example"])
+    assert err.value.code == 2 and "already in" in capsys.readouterr().err
 
 
 def test_the_ink_banner_is_the_university_banner_in_ink():
@@ -132,7 +155,9 @@ def test_the_example_data_holds_the_3_cases_of_the_figure():
 
 
 @pytest.mark.skipif(importlib.util.find_spec("fwl_mpl") is None, reason="no fwl-mpl")
-@pytest.mark.skipif(not shutil.which("pdftoppm"), reason="no pdftoppm")
+@pytest.mark.skipif(
+    not shutil.which("pdftoppm") or not shutil.which("pdftotext"), reason="no poppler"
+)
 def test_the_script_replots_the_committed_figure_from_the_data(tmp_path):
     work = tmp_path / "t"
     shutil.copytree(EXAMPLE, work, ignore=shutil.ignore_patterns("__pycache__"))
@@ -154,7 +179,14 @@ def test_the_script_replots_the_committed_figure_from_the_data(tmp_path):
     old = pixels(EXAMPLE / "figures" / "cooling.pdf", "old")
     assert new.shape == old.shape
     assert (np.abs(new - old) > 64).mean() < 0.002  # the same plot, up to anti-aliasing
-    assert (old < 128).mean() > 0.01  # the canary: the figure is not blank
+    assert (old < 128).mean() > 0.01 and (new < 128).mean() > 0.01  # neither is blank
+
+    def text(pdf):
+        out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, check=True)
+        return out.stdout.split()
+
+    assert text(work / "figures" / "cooling.pdf") == text(EXAMPLE / "figures" / "cooling.pdf")
+    assert {"Time", "(Myr)", "case", "3"} <= set(text(EXAMPLE / "figures" / "cooling.pdf"))
 
 
 def zip_parts(path):
@@ -215,6 +247,10 @@ EXTRA_BIB = (
     "@ARTICLE{Test2020, author = {{Test}, Ann}, title = {A test entry},"
     " journal = {\\apj}, year = 2020}\n"
 )
+TABLE = (
+    "\\begin{table}[h]\\caption{Parameters.}\\centering"
+    "\\begin{tabular}{ll}a & b\\end{tabular}\\end{table}\n"
+)
 LONG = "A long thesis title that runs over more than one line of the title page and the head"
 
 
@@ -228,7 +264,8 @@ def compiled(tmp_path_factory):
     for old, new in (
         ("\\documentclass{fwlthesis}", "\\documentclass[final]{fwlthesis}"),
         ("\\title{Title of the thesis}", f"\\title{{{LONG}}}\\shorttitle{{Short title}}"),
-        ("\\tableofcontents\n", "\\tableofcontents\n\\listoffigures\n"),
+        ("% \\listoffigures\n", "\\listoffigures\n\\listoftables\n"),
+        ("Figure~\\ref{fig:cooling} shows", TABLE + "Figure~\\ref{fig:cooling} shows"),
         ("The surface radiates", "\\subsection{Model}\nThe surface radiates"),
         ("\\bibliography{references}", "\\nocite{Test2020}\\bibliography{references,extra}"),
         ("% \\appendix\n% \\section{Appendix title}", "\\appendix\n\\section{Extra}\nText."),
@@ -274,6 +311,7 @@ FINAL = [
     "Samenvatting",
     "Contents",
     "List of Figures",
+    "List of Tables",
     "1 Introduction",
     "2 Methods",
     "3 Results",
@@ -303,6 +341,7 @@ def test_the_example_compiles_with_each_section_on_its_own_page(compiled):
     assert page_count(folder, "main") == len(SECTIONS) + 2
     assert page_count(folder, "final") == len(FINAL) + 1
     title = re.sub(r"\s+", " ", final[0])
+    assert "kapteyn" not in title.lower()  # the banner, an image, already names the institute
     for words in (
         LONG,
         "BSc thesis Astronomy",
@@ -318,7 +357,7 @@ def test_the_running_head_and_the_contents(compiled):
     folder, _ = compiled
     final = pages(folder, "final")
     by_heading = {heading(p): p for p in final[1:]}
-    assert head(by_heading["2 Methods"]).split("  ")[0].startswith("Short title")
+    assert head(by_heading["2 Methods"]).startswith("Short title")
     assert head(by_heading["2 Methods"]).endswith("2 Methods")
     assert head(by_heading["References"]).endswith("References")
     assert head(by_heading["A Extra"]).endswith("A Extra")
@@ -331,6 +370,13 @@ def test_the_running_head_and_the_contents(compiled):
         assert entry in contents, entry
     for entry in ("Abstract", "Samenvatting"):
         assert entry not in contents.replace("Contents", ""), entry
+    tables = re.sub(r"\s+", " ", by_heading["List of Tables"])
+    assert "1 Parameters." in tables
+    anchors = re.findall(r"\{([a-z]+\*?\.[0-9A-Za-z.]+)\}%", (folder / "final.toc").read_text())
+    assert len(anchors) == len(set(anchors)) == 12, anchors  # every entry links to its own page
+    methods = re.sub(r"\s+", " ", by_heading["2 Methods"])
+    assert "starts at 3000 K" in methods and "F the emitted flux" in methods
+    assert "Lichtenberg" not in methods
     figures = re.sub(r"\s+", " ", by_heading["List of Figures"])
     assert "1 Surface temperature against time" in figures and "zenodo" not in figures
 
@@ -388,3 +434,17 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
         "Geist-Light", "Geist-Medium", "Geist-Regular", "Geist-SemiBold", "GeistMono-Regular",
         "Inter-Italic", "Inter-Regular", "STIXTwoMath-Regular",
     }  # fmt: skip
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_a_long_title_without_a_short_form_gets_a_warning(compiled, tmp_path):
+    folder, logs = compiled
+    thesis.install_thesis(tmp_path)
+    doc = f"\\documentclass{{fwlthesis}}\\title{{{LONG}}}\\begin{{document}}x\\end{{document}}\n"
+    (tmp_path / "long.tex").write_text(doc)
+    run = subprocess.run(["lualatex", "-interaction=nonstopmode", "long"], cwd=tmp_path,
+                         capture_output=True, text=True, timeout=300)  # fmt: skip
+    assert run.returncode == 0, run.stdout[-1500:]
+    warning = "The title is too long"
+    assert warning in re.sub(r"\s+", " ", (tmp_path / "long.log").read_text(errors="replace"))
+    assert not any(warning in re.sub(r"\s+", " ", log) for log in logs.values())

@@ -70,7 +70,7 @@ jobs:
       - name: Install
         run: |
           pip install -e ".[test]"
-          pip install --no-deps "fwl-mpl @ git+https://github.com/FormingWorlds/fwl-mpl"
+          pip install --no-deps "fwl-mpl @ git+https://github.com/FormingWorlds/fwl-mpl@b147dd1736734ec069c1c08e7b093419f95d0fb9"
       - name: Compile and check the embedded fonts (fails if a test is skipped)
         run: |
           set -o pipefail
@@ -91,6 +91,7 @@ jobs:
             tests/test_thesis.py::test_citations_are_author_year_and_the_fonts_are_the_lab_fonts \
             tests/test_thesis.py::test_the_running_head_and_the_contents \
             tests/test_thesis.py::test_guides_are_grey_and_section_numbers_signal_blue \
-            tests/test_thesis.py::test_the_script_replots_the_committed_figure_from_the_data | tee out.txt
-          grep -qE "(^|[^0-9])32 passed" out.txt
+            tests/test_thesis.py::test_the_script_replots_the_committed_figure_from_the_data \
+            tests/test_thesis.py::test_a_long_title_without_a_short_form_gets_a_warning | tee out.txt
+          grep -qE "(^|[^0-9])33 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi

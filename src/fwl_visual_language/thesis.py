@@ -31,6 +31,7 @@ example thesis (text with guidance, data, plotting script, figure, references)::
 """
 
 import argparse
+import os
 import shutil
 import tempfile
 import zipfile
@@ -118,8 +119,13 @@ _BODY = r"""\newif\iffwl@final
 % Every section opens a new page, also one that follows another heading directly
 \AtBeginDocument{\let\fwl@section\section
   \renewcommand{\section}{\clearpage\@ifstar{\fwl@starred}{\fwl@section}}}
-\newcommand{\fwl@starred}[1]{\fwl@section*{#1}\markboth{#1}{}%
+\newcommand{\fwl@starred}[1]{\iffwl@listed\phantomsection\fi\fwl@section*{#1}\markboth{#1}{}%
   \iffwl@listed\addcontentsline{toc}{section}{#1}\fi}
+% A title wider than half the head needs \shorttitle
+\AtBeginDocument{\begingroup\let\\\relax
+  \settowidth{\@tempdima}{\ttfamily\footnotesize\fwl@short}%
+  \ifdim\@tempdima>0.55\textwidth\ClassWarningNoLine{fwlthesis}{The title is too long
+    for the running head; give a short form with \protect\shorttitle}\fi\endgroup}
 
 % Title page
 \newcommand{\fwl@type}{}\newcommand{\fwl@snum}{}\newcommand{\fwl@sup}{}
@@ -177,6 +183,13 @@ def thesis_cls(release=None):
     return "\n".join(head) + "\n" + _BODY + ADS_MACROS + "\\endinput\n"
 
 
+def _taken(dest, rel):
+    """Return whether ``rel`` or a folder on its way is taken by a file or a link in ``dest``."""
+    path = dest / rel
+    folders = [dest / parent for parent in Path(rel).parents if str(parent) != "."]
+    return os.path.lexists(path) or any(os.path.lexists(f) and not f.is_dir() for f in folders)
+
+
 def install_thesis(dest, example=False):
     """Write ``fwlthesis.cls``, the ``fwl`` package, the fonts and the logos into ``dest``.
 
@@ -202,9 +215,11 @@ def install_thesis(dest, example=False):
     """
     dest = Path(dest)
     src = Path(__file__).resolve().parent / "thesis_example"
-    taken = [rel for rel in EXAMPLE_FILES if example and (dest / rel).exists()]
+    taken = [rel for rel in EXAMPLE_FILES if example and _taken(dest, rel)]
     if taken:
-        raise FileExistsError(f"{', '.join(taken)} exist in {dest}; install the example elsewhere")
+        raise FileExistsError(
+            f"already in {dest}: {', '.join(taken)}; install the example elsewhere"
+        )
     install_latex(dest)
     for face in _LIGHT:
         shutil.copyfile(fonts_dir() / "ttf" / face, dest / FONT_DIR / face)
@@ -264,8 +279,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.zip:
         print(build_thesis_zip(args.dest))
-    else:
+        return
+    try:
         print(install_thesis(args.dest, example=args.example))
+    except FileExistsError as err:
+        parser.error(str(err))
 
 
 if __name__ == "__main__":

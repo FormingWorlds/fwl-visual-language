@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import __version__, fonts_dir, palette, ramp, roles, tokens
 
-__all__ = ["install_latex", "latex_name", "proposal_sty", "sty"]
+__all__ = ["ADS_MACROS", "install_latex", "latex_name", "proposal_sty", "sty"]
 
 STY_NAME = "fwl.sty"
 PROPOSAL_NAME = "fwlproposal.sty"
