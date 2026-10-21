@@ -30,7 +30,7 @@ SECTIONS = [
     "Data and code availability",
     "Acknowledgments",
     "References",
-    "A Additional material",
+    "A Appendix",
 ]
 
 
@@ -338,7 +338,7 @@ FINAL = [
     "Data and code availability",
     "Acknowledgments",
     "References",
-    "A Additional material",
+    "A Appendix",
 ]
 LOG_FAULTS = r"^!|Overfull|undefined|Missing character|Package fancyhdr Warning"
 
@@ -383,13 +383,13 @@ def test_the_running_head_and_the_contents(compiled):
     assert head(by_heading["2 Methods"]).startswith("Short title")
     assert head(by_heading["2 Methods"]).endswith("2 Methods")
     assert head(by_heading["References"]).endswith("References")
-    assert head(by_heading["A Additional material"]).endswith("A Additional material")
+    assert head(by_heading["A Appendix"]).endswith("A Appendix")
     assert LONG not in head(by_heading["2 Methods"])
     draft = {heading(p): p for p in pages(folder, "main")[1:]}
     assert head(draft["2 Methods"]).startswith("Title of the thesis")
     contents = re.sub(r"\s+", " ", by_heading["Contents"])
     for entry in ("1 Introduction", "2.1 Model", "5 Conclusions", "Data and code availability",
-                  "Acknowledgments", "References", "A Additional material"):  # fmt: skip
+                  "Acknowledgments", "References", "A Appendix"):  # fmt: skip
         assert entry in contents, entry
     for entry in ("Abstract", "Samenvatting"):
         assert entry not in contents.replace("Contents", ""), entry
@@ -449,11 +449,12 @@ def test_citations_are_author_year_and_the_fonts_are_the_lab_fonts(compiled):
     text = re.sub(r"\s+", " ", " ".join(pages(folder, "main")))
     assert "Lichtenberg et al. (2021)" in text and "(Lichtenberg et al. 2021)" in text
     assert "Journal of Geophysical Research (Planets), 126" in text
+    assert "Hamano, K., Abe, Y., & Genda, H. 2013, Nature, 497, 607" in text  # the \\nat macro
     for cite in (
-        "(Lichtenberg et al. 2021; Nicholls et al. 2024)",
-        "(e.g., Nicholls et al. 2024)",
+        "(Lichtenberg et al. 2021; Hamano et al. 2013)",
+        "(e.g., Hamano et al. 2013)",
         "(see Lichtenberg et al. 2021, Fig. 3)",
-        "(Nicholls et al. 2024, Sect. 2)",
+        "(Hamano et al. 2013, Sect. 2)",
     ):
         assert cite in text, cite
     final = re.sub(r"\s+", " ", " ".join(pages(folder, "final")))

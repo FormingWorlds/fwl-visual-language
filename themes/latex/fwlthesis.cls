@@ -87,8 +87,9 @@
 
 % Grey guidance; the final option hides all of it
 \newcommand{\guide}[1]{\iffwl@final\ignorespaces\else
-  \par{\small\raggedright\color{fwlInk500}#1\par}\medskip\fi}
+  \par{\small\emergencystretch=3em\color{fwlInk500}#1\par}\medskip\fi}
 \newcommand{\guidesection}[1]{\iffwl@final\else\section*{#1}\fi}
+% Code in guidance; \allowbreak inside it marks where a long command may break
 \newcommand{\guidecmd}[1]{\texttt{#1}}
 % Where the data and the script of a figure are published
 \newcommand{\figuredata}[1]{ Data and script: \url{#1}.}
