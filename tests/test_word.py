@@ -722,7 +722,19 @@ def test_google_docs_headings_have_no_numbers_and_heading_1_is_signal_blue(gdocs
         assert h1.find(".//w:numPr", NS) is None and h2.find(".//w:numPr", NS) is None, kind
         assert val(h1, "color") == "0072A1", kind
         assert val(h2, "color") == "010305", kind
-        assert val(style(path, "ListBullet").find(".//w:numPr", NS), "numId") == "91", kind
+        for sid, (num, lvl) in {
+            "ListBullet": ("91", "0"),
+            "ListNumber": ("92", "0"),
+            "ListNumber2": ("92", "1"),
+        }.items():
+            numpr = style(path, sid).find(".//w:numPr", NS)
+            assert (val(numpr, "numId"), val(numpr, "ilvl")) == (num, lvl), (kind, sid)
+        numbering = part(path, "word/numbering.xml")
+        ids = {a.get(f"{W}abstractNumId") for a in numbering.findall("w:abstractNum", NS)}
+        nums = {n.get(f"{W}numId") for n in numbering.findall("w:num", NS)}
+        assert {"91", "92"} <= ids and "90" not in ids and "90" not in nums, kind
+    word_ids = part(built["report", "geist"], "word/numbering.xml").findall("w:abstractNum", NS)
+    assert "90" in {a.get(f"{W}abstractNumId") for a in word_ids}
     hb = style(gdocs["handbook"], "Heading1")
     assert (val(hb, "sz"), fonts(hb)["ascii"]) == ("40", "Geist Light")
     assert hb.find(".//w:pageBreakBefore", NS) is not None
@@ -730,17 +742,17 @@ def test_google_docs_headings_have_no_numbers_and_heading_1_is_signal_blue(gdocs
 
 
 @pytest.mark.parametrize(
-    "kind, left",
+    "kind, left, count",
     [
-        ("letter", word.LAB_LINE),
-        ("report", "Title of the report  ·  Forming Worlds Lab"),
-        ("memo", "Forming Worlds Lab  ·  internal memo"),
-        ("handbook", "Forming Worlds Lab  ·  Handbook"),
+        ("letter", word.LAB_LINE, 2),
+        ("report", "Title of the report  ·  Forming Worlds Lab", 1),
+        ("memo", "Forming Worlds Lab  ·  internal memo", 1),
+        ("handbook", "Forming Worlds Lab  ·  Handbook", 1),
     ],
 )
-def test_google_docs_footers_put_text_and_page_at_the_right_without_tabs(gdocs, kind, left):
+def test_google_docs_footers_put_text_and_page_at_the_right_without_tabs(gdocs, kind, left, count):
     filled = [f for f in footers(gdocs[kind]) if f.find(".//w:fldSimple", NS) is not None]
-    assert filled, kind
+    assert len(filled) == count, kind
     for f in filled:
         assert f.find(".//w:tab", NS) is None and f.find(".//w:tabs", NS) is None, kind
         (p,) = f.findall("w:p", NS)
@@ -757,6 +769,7 @@ def test_the_google_docs_university_letter_footer_is_a_logo_and_number_table(gdo
         assert [c.tag for c in f] == [f"{W}tbl", f"{W}p"]  # Word needs a paragraph at the end
         tbl = f.find("w:tbl", NS)
         assert tbl.find("w:tblPr/w:tblBorders/w:top", NS).get(f"{W}val") == "nil"
+        assert_fixed_halves(tbl)
         logo, num = tbl.findall("w:tr/w:tc", NS)
         assert logo.find(".//{*}blip") is not None and logo.find(".//w:fldSimple", NS) is None
         assert num.find(".//w:fldSimple", NS).get(f"{W}instr") == "PAGE"
@@ -764,20 +777,52 @@ def test_the_google_docs_university_letter_footer_is_a_logo_and_number_table(gdo
         assert [val(c.find("w:tcPr", NS), "vAlign") for c in (logo, num)] == ["bottom"] * 2
 
 
+def assert_fixed_halves(tbl, first="4705", second="4706"):
+    """Assert a fixed 2-column table at the text width (9411 twips) with matching cells."""
+    tblw = tbl.find("w:tblPr/w:tblW", NS)
+    assert (tblw.get(f"{W}type"), tblw.get(f"{W}w")) == ("dxa", "9411")
+    assert tbl.find("w:tblPr/w:tblLayout", NS).get(f"{W}type") == "fixed"
+    grid = [g.get(f"{W}w") for g in tbl.findall("w:tblGrid/w:gridCol", NS)]
+    assert grid == [first, second]
+    for row in tbl.findall("w:tr", NS):
+        cells = [c.find("w:tcPr/w:tcW", NS) for c in row.findall("w:tc", NS)]
+        assert [(c.get(f"{W}type"), c.get(f"{W}w")) for c in cells] == [
+            ("dxa", first),
+            ("dxa", second),
+        ]
+
+
 def test_the_google_docs_memo_tables_have_fixed_text_width(gdocs, built):
     tables = part(gdocs["memo"], "word/document.xml").findall(".//w:tbl", NS)
     assert len(tables) == 2
-    for t in tables:
-        tblw = t.find("w:tblPr/w:tblW", NS)
-        assert (tblw.get(f"{W}type"), tblw.get(f"{W}w")) == ("dxa", "9411")
-        assert t.find("w:tblPr/w:tblLayout", NS).get(f"{W}type") == "fixed"
-    head = [g.get(f"{W}w") for g in tables[0].findall("w:tblGrid/w:gridCol", NS)]
-    rows = [g.get(f"{W}w") for g in tables[1].findall("w:tblGrid/w:gridCol", NS)]
-    assert head == ["4706", "4706"] and rows == ["1361", "8050"]
+    assert_fixed_halves(tables[0])
+    assert_fixed_halves(tables[1], "1361", "8050")
     body = part(gdocs["memo"], "word/document.xml").find("w:body", NS)
-    kids = [c.tag.split("}")[1] for c in body]
-    first = kids.index("tbl")
-    assert kids[first : first + 3] == ["tbl", "p", "tbl"]  # Google Docs joins adjacent tables
+    kids = list(body)
+    first = [c.tag for c in kids].index(f"{W}tbl")
+    filler = kids[first + 1]  # Google Docs joins adjacent tables
+    assert [c.tag for c in kids[first : first + 3]] == [f"{W}tbl", f"{W}p", f"{W}tbl"]
+    assert "".join(filler.itertext()) == "" and val(filler, "pStyle") == "Sender"
+
+
+def test_the_google_docs_letter_header_table_has_fixed_halves(gdocs, built):
+    with zipfile.ZipFile(gdocs["letter"]) as z:
+        hdrs = [
+            etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/header\d+\.xml", n)
+        ]
+    tables = [t for h in hdrs for t in h.findall("w:tbl", NS)]
+    assert len(tables) == 1
+    assert_fixed_halves(tables[0])
+    with zipfile.ZipFile(built["letter", "geist"]) as z:
+        hdrs = [
+            etree.fromstring(z.read(n))
+            for n in z.namelist()
+            if re.fullmatch(r"word/header\d+\.xml", n)
+        ]
+    (word_table,) = [t for h in hdrs for t in h.findall("w:tbl", NS)]
+    assert word_table.find("w:tblPr/w:tblLayout", NS) is None
     word_memo = part(built["memo", "geist"], "word/document.xml").find(".//w:tbl", NS)
     assert word_memo.find("w:tblPr/w:tblW", NS).get(f"{W}type") == "auto"
 
@@ -788,6 +833,8 @@ def test_the_google_docs_handbook_asks_for_google_contents_not_a_field(gdocs):
     assert doc.find(".//w:fldChar", NS) is None and doc.find(".//w:instrText", NS) is None
     body = texts(path)
     assert "Insert > Table of contents" in body and "Update Field" not in body
+    (hint,) = [p for p in doc.iter(f"{W}p") if "Insert > Table" in "".join(p.itertext())]
+    assert hint.find("w:r/w:br", NS).get(f"{W}type") == "page"
     for words in ("Handbook", "Contents", "Chapter", "A note that stands out", "A sub-step."):
         assert words in body
     assert body.index("Contents") < body.index("Chapter")
@@ -822,6 +869,15 @@ def test_google_docs_refuse_unknown_kinds_and_name_the_extra(tmp_path, monkeypat
     monkeypatch.setitem(sys.modules, "docx", None)
     with pytest.raises(ImportError, match=r"fwl-visual-language\[word\]"):
         word.build_gdocs(tmp_path)
+
+
+@pytest.mark.parametrize("extra", [["--face", "aptos"], ["--face", "all"], ["--docx"]])
+def test_the_command_line_refuses_face_and_docx_with_gdocs(tmp_path, capsys, extra):
+    with pytest.raises(SystemExit) as err:
+        word.main([str(tmp_path / "g"), "--gdocs", *extra])
+    assert err.value.code == 2
+    assert "takes neither --face nor --docx" in capsys.readouterr().err
+    assert not (tmp_path / "g").exists()
 
 
 def test_the_command_line_writes_the_google_docs_files(tmp_path, capsys):

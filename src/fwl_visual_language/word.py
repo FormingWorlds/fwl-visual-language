@@ -181,11 +181,23 @@ class _Builder:
             b, "w:shd", "w:tblLayout", "w:tblCellMar", "w:tblLook", "w:tblCaption"
         )
 
-    def full_width(self, table):
-        """Give a table the text width in twips; Google Docs ignores an automatic width."""
+    def full_width(self, table, first=None):
+        """Fix a 2-column table at the text width; ``first`` is column 1 in cm, half by default.
+
+        Google Docs splits a table without fixed widths into equal columns.
+        """
+        from docx.shared import Twips
+
+        total = self.Cm(TEXT_W).twips
+        a = self.Cm(first).twips if first else total // 2
+        table.autofit = False
         tblw = table._tbl.tblPr.find(self.qn("w:tblW"))
         tblw.set(self.qn("w:type"), "dxa")
-        tblw.set(self.qn("w:w"), str(self.Cm(TEXT_W).twips))
+        tblw.set(self.qn("w:w"), str(total))
+        for col, w in zip(table.columns, (a, total - a), strict=True):
+            col.width = Twips(w)
+            for cell in col.cells:
+                cell.width = Twips(w)
 
     # --- styles ----------------------------------------------------------------------------
 
@@ -281,9 +293,13 @@ class _Builder:
             + lvl(1, "lowerLetter", "%2.", 357, "ListNumber2", left=714)
             + "</w:abstractNum>"
         )
-        for a in (steps, bullet, heads):  # every abstractNum must come before the first num
+        # Google Docs keeps no heading numbers, so its files carry no heading list
+        lists = ((steps, LIST_NUM), (bullet, BULLET_NUM)) + (
+            () if self.gdocs else ((heads, HEADING_NUM),)
+        )
+        for a, _ in lists:  # every abstractNum must come before the first num
             num.insert(0, a)
-        for n in (HEADING_NUM, BULLET_NUM, LIST_NUM):
+        for n in sorted(n for _, n in lists):
             num.append(
                 self.parse(
                     f'<w:num {self.nsdecls("w")} w:numId="{n}">'
@@ -419,6 +435,8 @@ class _Builder:
         hdr = s.first_page_header
         t = hdr.add_table(1, 2, self.Cm(TEXT_W))
         self.no_borders(t)
+        if self.gdocs:
+            self.full_width(t)
         self.logo(t.cell(0, 0).paragraphs[0], 3.6)
         cell = t.cell(0, 1)
         for i, line in enumerate(SENDER):
@@ -456,22 +474,23 @@ class _Builder:
         for part in (s.first_page_footer, s.footer):
             p = part.paragraphs[0]
             p.style = self.doc.styles["Footer"]
-            if self.gdocs:  # no tab stops in Google Docs footers: logo and number in a table
+            if self.gdocs:  # Google Docs drops the right tab: logo and number in a table
                 t = part.add_table(1, 2, self.Cm(TEXT_W))
                 self.no_borders(t)
+                self.full_width(t)
                 p._p.getparent().append(p._p)  # the empty paragraph Word needs goes below
                 for cell in t.rows[0].cells:
                     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.BOTTOM
                 logo, num = t.cell(0, 0).paragraphs[0], t.cell(0, 1).paragraphs[0]
                 logo.style = num.style = self.doc.styles["Footer"]
                 num.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                self.logo(logo, 2.0)
-                self.page_field(num)
-                continue
-            self.right_tab(p)
-            self.logo(p, 2.0)
-            p.add_run("\t")
-            self.page_field(p)
+            else:
+                self.right_tab(p)
+                logo = num = p
+            self.logo(logo, 2.0)
+            if not self.gdocs:
+                p.add_run("\t")
+            self.page_field(num)
         self.letter_body()
 
     def letter_body(self):
@@ -513,11 +532,8 @@ class _Builder:
         s = self.page()
         t = self.doc.add_table(1, 2)
         self.no_borders(t)
-        if self.gdocs:  # Google Docs splits a table without fixed widths in equal columns
-            t.autofit = False
+        if self.gdocs:
             self.full_width(t)
-            for col in t.columns:
-                col.width = self.Cm(TEXT_W / 2)
         t.cell(0, 0).paragraphs[0].style = self.doc.styles["Memo label"]
         t.cell(0, 0).paragraphs[0].add_run("MEMO")
         right = t.cell(0, 1).paragraphs[0]
@@ -529,7 +545,7 @@ class _Builder:
         self.no_borders(rows)
         rows.autofit = False
         if self.gdocs:
-            self.full_width(rows)
+            self.full_width(rows, 2.4)
         for col, w in zip(rows.columns, (2.4, TEXT_W - 2.4), strict=True):
             col.width = self.Cm(w)
         for i, (k, v) in enumerate(
@@ -568,9 +584,22 @@ class _Builder:
         welcome.add_run().add_break(WD_BREAK.PAGE)
         self.para("Contents", "TOC Heading")
         if self.gdocs:  # Google Docs makes its own contents and reads no Word field
-            p = self.para("Choose Insert > Table of contents to list the chapters here.")
-            p.add_run().add_break(WD_BREAK.PAGE)
-            return self.handbook_body()
+            toc = self.para("Choose Insert > Table of contents to list the chapters here.")
+        else:
+            toc = self.contents_field()
+        toc.add_run().add_break(WD_BREAK.PAGE)
+        self.para("Chapter", "Heading 1")
+        self.para("Text of the chapter.")
+        self.para("Section", "Heading 2")
+        self.para("A step.", "List Number")
+        self.para("A sub-step.", "List Number 2")
+        self.para("Subsection, for example a meeting time", "Heading 3")
+        self.para("A note that stands out from the text.", "Note")
+        self.para("A point in a list.", "List Bullet")
+        self.footer(s.footer, "Forming Worlds Lab  ·  Handbook")
+
+    def contents_field(self):
+        """Return a paragraph with a Word contents field that lists Heading 1 and 2."""
         toc = self.para()
         toc._p.append(
             self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="begin"/></w:r>')
@@ -588,19 +617,7 @@ class _Builder:
         toc._p.append(
             self.parse(f'<w:r {self.nsdecls("w")}><w:fldChar w:fldCharType="end"/></w:r>')
         )
-        toc.add_run().add_break(WD_BREAK.PAGE)
-        self.handbook_body()
-
-    def handbook_body(self):
-        self.para("Chapter", "Heading 1")
-        self.para("Text of the chapter.")
-        self.para("Section", "Heading 2")
-        self.para("A step.", "List Number")
-        self.para("A sub-step.", "List Number 2")
-        self.para("Subsection, for example a meeting time", "Heading 3")
-        self.para("A note that stands out from the text.", "Note")
-        self.para("A point in a list.", "List Bullet")
-        self.footer(self.doc.sections[0].footer, "Forming Worlds Lab  ·  Handbook")
+        return toc
 
     def save(self, out, template):
         props = self.doc.core_properties
@@ -768,16 +785,19 @@ def main(argv=None):
     """Command line entry point: ``python -m fwl_visual_language.word FOLDER``."""
     parser = argparse.ArgumentParser(
         prog="python -m fwl_visual_language.word",
-        description="Write the Forming Worlds Lab Word templates (.dotx).",
+        description="Write the Forming Worlds Lab Word templates (.dotx), or with --gdocs "
+        "the Geist .docx files for Google Docs.",
     )
     parser.add_argument("folder", help="output folder")
-    parser.add_argument("--face", choices=[*FACES, "all"], default="all")
+    parser.add_argument("--face", choices=[*FACES, "all"], help="face of the Word templates")
     parser.add_argument("--docx", action="store_true", help="write .docx documents, not templates")
     parser.add_argument(
         "--gdocs", action="store_true", help="write the Geist .docx files for Google Docs"
     )
     args = parser.parse_args(argv)
-    faces = list(FACES) if args.face == "all" else [args.face]
+    if args.gdocs and (args.face or args.docx):
+        parser.error("--gdocs writes Geist .docx files and takes neither --face nor --docx")
+    faces = list(FACES) if args.face in (None, "all") else [args.face]
     if args.gdocs:
         written = build_gdocs(args.folder)
     else:
