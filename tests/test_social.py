@@ -1,6 +1,7 @@
 """Social media cards: author line, texts and their places, crops, fades, limits and the spec."""
 
 import json
+import re
 import runpy
 import sys
 
@@ -479,3 +480,222 @@ def test_the_module_runs_as_a_script(tmp_path, monkeypatch):
         runpy.run_module("fwl_visual_language.social", run_name="__main__")
     assert exit_.value.code == 0
     assert (tmp_path / "out" / "a.png").is_file()
+
+
+CAPTION = "Each dot is one model run; blue runs keep more than 0.1 bar of atmosphere."
+
+
+def old_figure_card(out, figure, headline, source, ref):
+    """The figure card as it was before captions, to compare the output pixel by pixel."""
+    c = social._Card(1080)
+    y = c.block((48, 48), headline, "SemiBold", 46, INK["0"], 1080 - 96, 1.12, 2)
+    pad, top = 16, y + 22
+    fig = social._open(figure)
+    w = c.u(1080 - 96 - 2 * pad)
+    h = round(fig.height * w / fig.width)
+    fig = fig.resize((w, h), c.Image.LANCZOS)
+    c.d.rounded_rectangle(
+        (c.u(48), c.u(top), c.size - c.u(48), c.u(top) + h + c.u(2 * pad)), c.u(14), fill=INK["0"]
+    )
+    c.im.alpha_composite(fig, (c.u(48 + pad), c.u(top + pad)))
+    bottom = c.u(top) + h + c.u(2 * pad)
+    c.block((48, (bottom + c.u(22)) / c.s), source, "Regular", 28,
+            INK["300"], 1080 - 96 - 130, 1, 1)  # fmt: skip
+    c.block((48, 1080 - 76), ref, "mono", 26, INK["300"], 1080 - 96 - 130, 1, 1)
+    c.logo((48, 1080 - 96), 52)
+    return c.save(out)
+
+
+def pixels(path):
+    import numpy as np
+
+    return np.asarray(Image.open(path).convert("RGB")).tolist()
+
+
+def test_a_figure_card_without_caption_matches_the_card_before_captions(tmp_path, figure):
+    args = (figure, "A headline over two words", "Source, Fig. 2", "arXiv:0000.00000")
+    old = old_figure_card(tmp_path / "old.png", *args)
+    new = social.figure_card(tmp_path / "new.png", *args)
+    none = social.figure_card(tmp_path / "none.png", *args, caption=None)
+    assert pixels(new) == pixels(old) == pixels(none)
+
+
+def test_the_caption_sits_between_the_panel_and_the_source(tmp_path, figure, drawn):
+    im = Image.open(
+        social.figure_card(tmp_path / "f.png", figure, "Headline", "Source", "ref", caption=CAPTION)
+    )
+    boxes = {t: (b, f) for b, t, f in drawn}
+    caption_rows = [(b, t) for b, t, f in drawn if f == INK["100"]]
+    assert " ".join(t for _, t in caption_rows) == CAPTION and len(caption_rows) == 2
+    (src_box, src_fill) = boxes["Source"]
+    assert src_fill == INK["300"]
+    assert caption_rows[-1][0][3] < src_box[1]  # the source is under the caption
+    # the white panel ends 18 px above the first caption line's top (Geist's ascent gap aside)
+    column = [im.getpixel((60, y))[:3] for y in range(1080)]
+    panel_bottom = max(y for y, px in enumerate(column) if near(px, (255, 255, 255), 2))
+    assert 18 <= caption_rows[0][0][1] - panel_bottom <= 18 + 12
+    logo = logo_box(1080, 48, 984, 52)
+    assert not any(overlaps(b, logo) for b, _, _ in drawn)
+    assert src_box[3] < 1080 - 96  # the source stays above the logo row
+
+
+def test_a_caption_of_5_lines_is_refused_and_never_shrinks(tmp_path):
+    figure = tmp_path / "wide.png"
+    # 575 px high on the card: it fits beside 4 caption lines (594 px) but not beside 5 (555 px)
+    Image.new("RGB", (1000, 604), (200, 30, 30)).save(figure)
+    exact = fill_to(4, "word ", breaker("Regular", 30, 1080 - 96))
+    social.figure_card(tmp_path / "ok.png", figure, "H", "S", "ref", caption=exact)
+    with pytest.raises(ValueError, match="holds 4"):
+        social.figure_card(
+            tmp_path / "no.png", figure, "H", "S", "ref", caption=exact + "word " * 8
+        )
+
+
+def test_a_figure_that_fits_without_a_caption_is_refused_with_one(tmp_path):
+    tall = tmp_path / "tall.png"
+    # 720 px high on the card: room 776 px without a caption, 672 px with 2 caption lines
+    Image.new("RGB", (1000, 756), "white").save(tall)
+    social.figure_card(tmp_path / "a.png", tall, "One headline line", "S", "ref")
+    with pytest.raises(ValueError, match="px of height"):
+        social.figure_card(
+            tmp_path / "b.png", tall, "One headline line", "S", "ref", caption=CAPTION
+        )
+
+
+@pytest.mark.parametrize(
+    "status, journal, expect",
+    [
+        (None, None, "arXiv:1"),
+        (
+            "accepted",
+            "The Astrophysical Journal",
+            "arXiv:1 · Accepted to The Astrophysical Journal",
+        ),
+        ("Submitted", "Icarus", "arXiv:1 · Submitted to Icarus"),
+        ("published", "Nature", "arXiv:1 · Published in Nature"),
+    ],
+)
+def test_the_reference_line_carries_the_status(status, journal, expect):
+    assert social.ref_line("arXiv:1", status, journal) == expect
+
+
+@pytest.mark.parametrize(
+    "status, journal, match",
+    [
+        ("accepted", None, "needs a journal"),
+        (None, "ApJ", "needs a journal"),
+        ("in press", "ApJ", "unknown status"),
+    ],
+)
+def test_the_reference_line_refuses_half_a_status(status, journal, match):
+    with pytest.raises(ValueError, match=match):
+        social.ref_line("arXiv:1", status, journal)
+
+
+def test_cards_and_specs_take_status_and_journal(tmp_path, figure, drawn):
+    spec = {
+        "base": str(tmp_path),
+        "cards": [
+            {"card": "glance", "file": "g", "text": "T", "ref": "arXiv:1", "status": "accepted",
+             "journal": "The Astrophysical Journal"},
+            {"card": "cover", "file": "c", "question": "Q", "lead": "L", "ref": "arXiv:1",
+             "status": "published", "journal": "Nature"},
+            {"card": "figure", "file": "f", "figure": figure.name, "headline": "H", "source": "S",
+             "ref": "arXiv:1", "status": "submitted", "journal": "Icarus"},
+        ],
+    }  # fmt: skip
+    social.render(spec, tmp_path / "out")
+    texts = {t for _, t, _ in drawn}
+    assert {
+        "arXiv:1 · Accepted to The Astrophysical Journal",
+        "arXiv:1 · Published in Nature",
+        "arXiv:1 · Submitted to Icarus",
+    } <= texts
+
+
+LONG_REF = "arXiv:2609.20155 · Accepted to The Astrophysical Journal"
+
+
+@pytest.mark.parametrize(
+    "make, nominal",
+    [
+        (lambda o, f, r: social.glance_card(o, "T", r), 28),
+        (lambda o, f, r: social.cover_card(o, "Q", "L", r), 28),
+        (lambda o, f, r: social.figure_card(o, f, "H", "S", r), 26),
+    ],
+)
+def test_a_long_reference_shrinks_to_the_largest_size_that_fits(
+    tmp_path, figure, monkeypatch, make, nominal
+):
+    sizes = []
+    real = social._Card.block
+
+    def spy(self, xy, text, face, px, *a):
+        if face == "mono":
+            sizes.append((text, px, a[1]))
+        return real(self, xy, text, face, px, *a)
+
+    monkeypatch.setattr(social._Card, "block", spy)
+    make(tmp_path / "short.png", figure, "arXiv:1")
+    make(tmp_path / "long.png", figure, LONG_REF)
+    (short, short_px, _), (long, long_px, width) = sizes
+    assert short_px == nominal and long == LONG_REF and long_px < nominal
+    c = social._Card(1080)
+    assert c.d.textlength(LONG_REF, font=c.font("mono", long_px)) <= c.u(width)
+    assert c.d.textlength(LONG_REF, font=c.font("mono", long_px + 1)) > c.u(width)
+    with pytest.raises(ValueError, match="holds 1 line even at 20 px"):
+        make(tmp_path / "no.png", figure, LONG_REF * 2)
+
+
+@pytest.mark.parametrize(
+    "make, logo",
+    [
+        (lambda o, f: social.glance_card(o, "T", LONG_REF), logo_box(1080, 64, 968, 60)),
+        (lambda o, f: social.cover_card(o, "Q", "L", LONG_REF), logo_box(1080, 64, 956, 60)),
+        (lambda o, f: social.figure_card(o, f, "H", "S", LONG_REF), logo_box(1080, 48, 984, 52)),
+    ],
+)
+def test_a_shrunk_reference_ends_32_px_before_the_logo(tmp_path, figure, drawn, make, logo):
+    make(tmp_path / "x.png", figure)
+    (box,) = [b for b, t, _ in drawn if t == LONG_REF]
+    assert box[2] <= logo[0] - 32 + 1 and not overlaps(box, logo)
+
+
+@pytest.mark.parametrize(
+    "make, chars",
+    [
+        (
+            lambda o, f: social.glance_card(o, "Efficiency η of 10⁻² holds", "ref"),
+            "η (U+03B7), ⁻ (U+207B)",
+        ),
+        (
+            lambda o, f: social.figure_card(o, f, "H", "S", "ref", caption="η sets the escape"),
+            "η (U+03B7)",
+        ),
+        (lambda o, f: social.glance_card(o, "T", "ref", label="η label"), "Η (U+0397)"),
+        (lambda o, f: social.highlight_card(o, f, (0, 0, 100), "η"), "η (U+03B7)"),
+        (lambda o, f: social.event_card(o, "E", "W", "H", [("A", "η 1")]), "η (U+03B7)"),
+    ],
+)
+def test_a_missing_glyph_gives_a_warning(tmp_path, figure, make, chars):
+    with pytest.warns(UserWarning, match=r"has no glyph for " + re.escape(chars)):
+        make(tmp_path / "x.png", figure)
+
+
+def test_subscript_digits_and_the_middle_dot_give_no_warning(tmp_path, figure, recwarn):
+    # a line break or a tab in a text is not drawn, so it needs no glyph
+    social.glance_card(tmp_path / "g.png", "H₂O, S₂\nand SO₂\toutgas.", "arXiv:1 · Accepted to ApJ")
+    social.figure_card(tmp_path / "f.png", figure, "S₂ builds up", "S", "ref", caption="H₂ and CO₂")
+    assert [w for w in recwarn if "no glyph" in str(w.message)] == []
+
+
+def test_render_warns_for_a_missing_glyph_in_a_spec(tmp_path):
+    spec = {"cards": [{"card": "glance", "file": "g", "text": "η matters", "ref": "r"}]}
+    with pytest.warns(UserWarning, match="Geist-Regular has no glyph for η"):
+        social.render(spec, tmp_path)
+
+
+@pytest.mark.parametrize("ref", ["", "   "])
+def test_an_empty_reference_is_refused(tmp_path, ref):
+    with pytest.raises(ValueError, match="empty"):
+        social.glance_card(tmp_path / "g.png", "T", ref)

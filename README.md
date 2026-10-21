@@ -147,13 +147,20 @@ The command renders square 1080 px PNG cards for Bluesky, Mastodon, Instagram an
 |---|---|
 | `paper` | the first author's photo, the paper title, and the first 3 authors, the number of the others and every lab member among them ("and 10 co-authors, incl. ...") |
 | `glance` | the At a glance text of the paper, up to 15 lines |
-| `figure` | a headline, the figure on a white panel and its source |
+| `figure` | a headline, the figure on a white panel, an optional `caption` of up to 4 lines and the source |
 | `cover` | the question the paper answers, as the first slide of a carousel |
 | `member` | a member's photo with the name and up to 2 short lines |
 | `event` | a conference with up to 7 lab contributions |
 | `highlight` | an Instagram Story Highlight cover from a square detail of an artwork |
 
 Every text is measured: a text that does not fit its card, a lab member who is not among the authors, or an unknown key stops the command with an error before a wrong card goes out. The command checks the whole list before it writes the first card. Photos and artwork are not in this repository; the cards take them from the caller.
+
+The `glance`, `figure` and `cover` cards end with a reference line in Geist Mono. Give `status` (`submitted`, `accepted` or `published`) and `journal` with the `ref`, and the line reads `arXiv:2609.20155 · Accepted to The Astrophysical Journal`. The reference line is the one text that shrinks: when it does not fit at its size, it takes the largest size down to 20 px at which it ends 32 px before the logo. A figure caption never shrinks; it takes height from the figure, and a figure that then no longer fits stops the command. Geist has no glyph for some characters, for example η and the superscript minus (⁻); such a character draws as a blank box, so the command warns about it. Subscript digits, as in H₂O, are in Geist.
+
+What the cards say:
+
+- The `figure` headline gives the finding. The `caption` tells the viewer how to read the plot: what one column, row, dot or bar is, what a colour or hatching means, and where to look.
+- The `glance` text names the actual species, the field and the physical contrast, and it ends with the test that observations can make.
 
 ## Develop
 

@@ -6,7 +6,8 @@ LinkedIn. The cards are:
 - ``paper``: the first author's photo with the paper title and an author line
   that names every lab member;
 - ``glance``: the short plain-language summary of a paper;
-- ``figure``: a figure with a headline and its source;
+- ``figure``: a figure with a headline, an optional caption that says how to read it,
+  and its source;
 - ``cover``: the question a paper answers, as the first slide of a carousel;
 - ``member``: a member intro over the member's photo;
 - ``event``: a conference card with the lab contributions;
@@ -15,12 +16,16 @@ LinkedIn. The cards are:
 The cards sit on the ink ground, or on a photo or artwork darkened towards ink.
 Photos and artwork come from the caller. Every text is measured: a text that does
 not fit its card raises ``ValueError`` instead of running off the card or under
-the logo. Run ``python -m fwl_visual_language.social SPEC.json DIR`` to render the
-cards that a JSON file lists.
+the logo; only the 1-line reference in Geist Mono shrinks, down to 20 px, to fit.
+A character that Geist has no glyph for (for example η or a superscript minus)
+draws as a blank box, so drawing one gives a warning. Run
+``python -m fwl_visual_language.social SPEC.json DIR`` to render the cards that a
+JSON file lists.
 """
 
 import argparse
 import json
+import warnings
 from pathlib import Path
 
 from . import assets_dir, fonts_dir, ramp
@@ -35,6 +40,7 @@ __all__ = [
     "highlight_card",
     "member_card",
     "paper_card",
+    "ref_line",
     "render",
 ]
 
@@ -42,6 +48,49 @@ SIZE = 1080
 INK = ramp("ink")
 SIGNAL = ramp("signal")
 MARGIN = 48
+MONO_MIN = 20  # smallest px of a reference line that shrinks to fit
+STATUS = {"submitted": "Submitted to", "accepted": "Accepted to", "published": "Published in"}
+_CMAPS = {}
+
+
+def ref_line(ref, status=None, journal=None):
+    """Return the reference line, with the publication status when one is given.
+
+    Parameters
+    ----------
+    ref : str
+        The reference, for example ``arXiv:2609.20155``.
+    status : str, optional
+        ``submitted``, ``accepted`` or ``published``.
+    journal : str, optional
+        The journal in full, for example ``The Astrophysical Journal``.
+
+    Returns
+    -------
+    str
+        ``ref``, or ``"arXiv:2609.20155 · Accepted to The Astrophysical Journal"``.
+
+    Raises
+    ------
+    ValueError
+        If only one of ``status`` and ``journal`` is given, or ``status`` is unknown.
+    """
+    if status is None and journal is None:
+        return ref
+    if not status or not journal:
+        raise ValueError("a status needs a journal and a journal needs a status")
+    if status.lower() not in STATUS:
+        raise ValueError(f"unknown status {status!r}; statuses: {', '.join(STATUS)}")
+    return f"{ref} · {STATUS[status.lower()]} {journal}"
+
+
+def _missing(name, text):
+    """Return the characters of ``text`` that the font file ``name`` has no glyph for."""
+    if name not in _CMAPS:
+        from fontTools.ttLib import TTFont
+
+        _CMAPS[name] = set(TTFont(fonts_dir() / "ttf" / f"{name}.ttf").getBestCmap())
+    return sorted({ch for ch in text if not ch.isspace() and ord(ch) not in _CMAPS[name]})
 
 
 def author_line(authors, lab, shown=3):
@@ -110,11 +159,25 @@ class _Card:
     def u(self, v):
         return round(v * self.s)
 
+    @staticmethod
+    def name(face):
+        return "GeistMono-Regular" if face == "mono" else f"Geist-{face}"
+
     def font(self, face, px):
         from PIL import ImageFont
 
-        name = "GeistMono-Regular" if face == "mono" else f"Geist-{face}"
-        return ImageFont.truetype(str(fonts_dir() / "ttf" / f"{name}.ttf"), self.u(px))
+        return ImageFont.truetype(str(fonts_dir() / "ttf" / f"{self.name(face)}.ttf"), self.u(px))
+
+    def check(self, text, face):
+        """Warn when the face has no glyph for a character of ``text``: it draws a blank box."""
+        gone = _missing(self.name(face), text)
+        if gone:
+            chars = ", ".join(f"{ch} (U+{ord(ch):04X})" for ch in gone)
+            warnings.warn(
+                f"{self.name(face)} has no glyph for {chars}; "
+                f"it draws a blank box in {text[:40]!r}",
+                stacklevel=3,
+            )
 
     def lines(self, text, font, width):
         """Break ``text`` into lines no wider than ``width`` px."""
@@ -136,6 +199,7 @@ class _Card:
         """Draw wrapped text at a design position; return the y below it."""
         if not text.strip():
             raise ValueError("a card text is empty")
+        self.check(text, face)
         font = self.font(face, px)
         rows = self.lines(text, font, self.u(width))
         if len(rows) > max_lines:
@@ -148,8 +212,18 @@ class _Card:
             y += round(font.size * lead)
         return y / self.s
 
+    def fit(self, xy, text, face, px, fill, width):
+        """Draw 1 line, from ``px`` down to :data:`MONO_MIN` px until it fits ``width``."""
+        if not text.strip():
+            raise ValueError("a card text is empty")
+        for size in range(px, MONO_MIN - 1, -1):
+            if self.d.textlength(text, font=self.font(face, size)) <= self.u(width):
+                return self.block(xy, text, face, size, fill, width, 1, 1)
+        raise ValueError(f"the text holds 1 line even at {MONO_MIN} px: {text[:40]!r}")
+
     def right(self, x_end, y, text, face, px, fill, width):
         """Draw 1 line that ends at design ``x_end``; refuse it when wider than ``width``."""
+        self.check(text, face)
         font = self.font(face, px)
         w = self.d.textlength(text, font=font)
         if w > self.u(width):
@@ -158,6 +232,7 @@ class _Card:
 
     def label(self, xy, text, px=26, width=SIZE - 2 * MARGIN - 140):
         """Draw a tracked capital label in signal-400; refuse it when wider than ``width``."""
+        self.check(text.upper(), "SemiBold")
         font, x = self.font("SemiBold", px), self.u(xy[0])
         total = sum(self.d.textlength(ch, font=font) + self.u(3) for ch in text.upper())
         if total > self.u(width):
@@ -165,6 +240,15 @@ class _Card:
         for ch in text.upper():
             self.d.text((x, self.u(xy[1])), ch, font=font, fill=SIGNAL["400"])
             x += self.d.textlength(ch, font=font) + self.u(3)
+
+    @staticmethod
+    def logo_room(margin, height, gap=32):
+        """Return the design width from ``margin`` to ``gap`` px before a right-hand logo."""
+        from PIL import Image
+
+        with Image.open(assets_dir() / "fwl-logo-white.png") as lg:
+            width = lg.width * height / lg.height
+        return SIZE - 2 * margin - width - gap
 
     def logo(self, xy, height=60, right=True):
         lg = self.Image.open(assets_dir() / "fwl-logo-white.png").convert("RGBA")
@@ -267,7 +351,7 @@ def paper_card(out, photo, title, authors, lab=(), label="New paper", focus=(0.5
     return c.save(out)
 
 
-def glance_card(out, text, ref, label="At a glance", size=SIZE):
+def glance_card(out, text, ref, label="At a glance", status=None, journal=None, size=SIZE):
     """Write the summary card: a label, the plain-language summary and the reference.
 
     Parameters
@@ -277,9 +361,12 @@ def glance_card(out, text, ref, label="At a glance", size=SIZE):
     text : str
         The summary, at most 15 lines at 41 px.
     ref : str
-        Reference in Geist Mono at the foot, for example ``arXiv:2609.03144``.
+        Reference in Geist Mono at the foot, for example ``arXiv:2609.03144``; it
+        shrinks to fit 1 line.
     label : str
         Capital label above the text.
+    status, journal : str, optional
+        Publication status and journal, added to the reference by :func:`ref_line`.
     size : int
         Card side in px.
 
@@ -296,13 +383,19 @@ def glance_card(out, text, ref, label="At a glance", size=SIZE):
     c = _Card(size)
     c.label((64, 64), label, 28)
     c.block((64, 118), text, "Regular", 41, INK["100"], SIZE - 128, 1.36, 15)
-    c.block((64, SIZE - 96), ref, "mono", 28, INK["400"], SIZE - 128 - 180, 1, 1)
+    ref = ref_line(ref, status, journal)
+    c.fit((64, SIZE - 96), ref, "mono", 28, INK["400"], c.logo_room(64, 60))
     c.logo((64, SIZE - 112))
     return c.save(out)
 
 
-def figure_card(out, figure, headline, source, ref, size=SIZE):
+def figure_card(
+    out, figure, headline, source, ref, caption=None, status=None, journal=None, size=SIZE
+):
     """Write the figure card: headline, the figure on a white panel, source and reference.
+
+    With a caption, the caption sits under the panel and the source under the caption,
+    and the figure gets less height.
 
     Parameters
     ----------
@@ -315,7 +408,11 @@ def figure_card(out, figure, headline, source, ref, size=SIZE):
     source : str
         Source line under the figure, for example ``Postolec et al., Fig. 2``.
     ref : str
-        Reference in Geist Mono at the foot.
+        Reference in Geist Mono at the foot; it shrinks to fit 1 line.
+    caption : str, optional
+        How to read the figure, at most 4 lines at 30 px.
+    status, journal : str, optional
+        Publication status and journal, added to the reference by :func:`ref_line`.
     size : int
         Card side in px.
 
@@ -327,16 +424,24 @@ def figure_card(out, figure, headline, source, ref, size=SIZE):
     Raises
     ------
     ValueError
-        If the headline needs more than 2 lines, the source or the reference
-        more than 1, or the figure is too tall for the space left.
+        If the headline needs more than 2 lines, the caption more than 4, the
+        source more than 1, the reference does not fit 1 line at 20 px, or the
+        figure is too tall for the space left. A caption never shrinks.
     """
     c = _Card(size)
+    ref = ref_line(ref, status, journal)
     y = c.block((MARGIN, 48), headline, "SemiBold", 46, INK["0"], SIZE - 2 * MARGIN, 1.12, 2)
     pad, top = 16, y + 22
     fig = _open(figure)
     w = c.u(SIZE - 2 * MARGIN - 2 * pad)
     h = round(fig.height * w / fig.width)
     room = c.u(SIZE - 150) - c.u(top) - c.u(2 * pad)
+    if caption is not None:
+        rows = c.lines(caption, c.font("Regular", 30), c.u(SIZE - 2 * MARGIN))
+        if len(rows) > 4:
+            raise ValueError(f"text needs {len(rows)} lines, the card holds 4: {caption[:40]!r}")
+        # the caption, its gaps and the smaller source take this height from the figure
+        room = c.u(SIZE - 140 - (36 + 30 * 1.3 * len(rows))) - c.u(top) - c.u(2 * pad)
     if h > room:
         raise ValueError(f"the figure needs {h} px of height, the card has {room}")
     fig = fig.resize((w, h), c.Image.LANCZOS)
@@ -347,22 +452,35 @@ def figure_card(out, figure, headline, source, ref, size=SIZE):
     )
     c.im.alpha_composite(fig, (c.u(MARGIN + pad), c.u(top + pad)))
     bottom = c.u(top) + h + c.u(2 * pad)
-    c.block(
-        (MARGIN, (bottom + c.u(22)) / c.s),
-        source,
-        "Regular",
-        28,
-        INK["300"],
-        SIZE - 2 * MARGIN - 130,
-        1,
-        1,
-    )
-    c.block((MARGIN, SIZE - 76), ref, "mono", 26, INK["300"], SIZE - 2 * MARGIN - 130, 1, 1)
+    if caption is None:
+        c.block(
+            (MARGIN, (bottom + c.u(22)) / c.s),
+            source,
+            "Regular",
+            28,
+            INK["300"],
+            SIZE - 2 * MARGIN - 130,
+            1,
+            1,
+        )
+    else:
+        y = c.block(
+            (MARGIN, bottom / c.s + 18),
+            caption,
+            "Regular",
+            30,
+            INK["100"],
+            SIZE - 2 * MARGIN,
+            1.3,
+            4,
+        )
+        c.block((MARGIN, y + 8), source, "Regular", 26, INK["300"], SIZE - 2 * MARGIN - 130, 1, 1)
+    c.fit((MARGIN, SIZE - 76), ref, "mono", 26, INK["300"], c.logo_room(MARGIN, 52))
     c.logo((MARGIN, SIZE - 96), 52)
     return c.save(out)
 
 
-def cover_card(out, question, lead, ref, label="New paper", size=SIZE):
+def cover_card(out, question, lead, ref, label="New paper", status=None, journal=None, size=SIZE):
     """Write the carousel cover: the question a paper answers, in Geist Light.
 
     Parameters
@@ -374,9 +492,11 @@ def cover_card(out, question, lead, ref, label="New paper", size=SIZE):
     lead : str
         One line at the foot, for example ``Led by PhD student Emma Postolec``.
     ref : str
-        Reference in Geist Mono under the lead.
+        Reference in Geist Mono under the lead; it shrinks to fit 1 line.
     label : str
         Capital label above the question.
+    status, journal : str, optional
+        Publication status and journal, added to the reference by :func:`ref_line`.
     size : int
         Card side in px.
 
@@ -395,7 +515,8 @@ def cover_card(out, question, lead, ref, label="New paper", size=SIZE):
     y = c.block((64, 160), question, "Light", 86, INK["0"], SIZE - 128, 1.08, 6)
     c.d.rectangle((c.u(64), c.u(y + 30), c.u(174), c.u(y + 36)), fill=SIGNAL["400"])
     c.block((64, SIZE - 160), lead, "Regular", 32, INK["300"], SIZE - 128 - 180, 1.2, 1)
-    c.block((64, SIZE - 112), ref, "mono", 28, INK["300"], SIZE - 128 - 180, 1, 1)
+    ref = ref_line(ref, status, journal)
+    c.fit((64, SIZE - 112), ref, "mono", 28, INK["300"], c.logo_room(64, 60))
     c.logo((64, SIZE - 124))
     return c.save(out)
 
@@ -533,6 +654,7 @@ def highlight_card(out, art, box, label, size=SIZE):
     ink = tuple(int(INK["950"][i : i + 2], 16) for i in (1, 3, 5))
     ground.alpha_composite(Image.new("RGBA", (size, size), ink + (120,)))
     c = _Card(size, ground)
+    c.check(label, "Medium")
     font = c.font("Medium", 120)
     rows = c.lines(label, font, c.u(760))
     if len(rows) > 2:
