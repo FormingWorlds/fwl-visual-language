@@ -222,8 +222,6 @@ class _Card:
 
     def fit(self, xy, text, face, px, fill, width):
         """Draw 1 line at the largest size from ``px`` to :data:`MONO_MIN` that fits ``width``."""
-        if not text.strip():
-            raise ValueError("a card text is empty")
         line = " ".join(text.split())  # as block() draws it
         for size in range(px, MONO_MIN - 1, -1):
             if self.d.textlength(line, font=self.font(face, size)) <= self.u(width):
