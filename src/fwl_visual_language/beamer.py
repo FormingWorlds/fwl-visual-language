@@ -28,7 +28,22 @@ ASSET_DIR = "fwl-assets"
 _LIGHT = ("Geist-Light.ttf", "Geist-LightItalic.ttf")
 _LOGO = "fwl-logo-white.png"
 
-_BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
+ADS_MACROS = r"""% ADS journal macros, at \begin{document} and only where the preamble defines none
+\AtBeginDocument{%
+\providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
+\providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
+\providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
+\providecommand{\baas}{BAAS}\providecommand{\icarus}{Icarus}\providecommand{\jcap}{JCAP}
+\providecommand{\jgr}{JGR}\providecommand{\grl}{GRL}\providecommand{\gca}{GCA}
+\providecommand{\jqsrt}{JQSRT}\providecommand{\mnras}{MNRAS}\providecommand{\nat}{Nature}
+\providecommand{\na}{New Astron.}\providecommand{\pasa}{PASA}\providecommand{\pasj}{PASJ}
+\providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
+\providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
+\providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
+\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}}
+"""
+_BODY = (
+    r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
   {\PackageError{beamerthemefwl}{fwl.sty is older than this theme}{Install both again.}}%
   \fwlusemath}{\RequirePackage[math]{fwl}[2026/10/20]}
 \RequirePackage{tikz}
@@ -108,20 +123,9 @@ _BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
 \fwljournal{Annu. Rev. Astron. Astrophys.}{ARA\&A}
 \fwljournal{Geochim. Cosmochim. Acta}{GCA}
 \fwljournal{J. Open Source Softw.}{JOSS}
-% ADS journal macros, at \begin{document} and only where the preamble defines none
-\AtBeginDocument{%
-\providecommand{\aj}{AJ}\providecommand{\araa}{ARA\&A}\providecommand{\apj}{ApJ}
-\providecommand{\apjl}{ApJL}\providecommand{\apjs}{ApJS}\providecommand{\apss}{Ap\&SS}
-\providecommand{\aap}{A\&A}\providecommand{\aapr}{A\&A Rv}\providecommand{\aaps}{A\&AS}
-\providecommand{\baas}{BAAS}\providecommand{\icarus}{Icarus}\providecommand{\jcap}{JCAP}
-\providecommand{\jgr}{JGR}\providecommand{\grl}{GRL}\providecommand{\gca}{GCA}
-\providecommand{\jqsrt}{JQSRT}\providecommand{\mnras}{MNRAS}\providecommand{\nat}{Nature}
-\providecommand{\na}{New Astron.}\providecommand{\pasa}{PASA}\providecommand{\pasj}{PASJ}
-\providecommand{\pasp}{PASP}\providecommand{\planss}{Planet. Space Sci.}\providecommand{\psj}{PSJ}
-\providecommand{\prd}{Phys. Rev. D}\providecommand{\prl}{Phys. Rev. Lett.}
-\providecommand{\physrep}{Phys. Rep.}\providecommand{\procspie}{Proc. SPIE}
-\providecommand{\solphys}{Sol. Phys.}\providecommand{\ssr}{Space Sci. Rev.}}
-
+"""
+    + ADS_MACROS
+    + r"""
 % "Teske+ 25 ApJL": 1 or 2 family names, always with a prefix such as "van", else the first
 % plus "+" (also for "and others"); a 2-digit year with the letter that tells papers of one
 % author and year apart (25a, 25b); the journal in italics.
@@ -246,6 +250,7 @@ _BODY = r"""\@ifpackageloaded{fwl}{\@ifpackagelater{fwl}{2026/10/20}{}%
     \end{tikzpicture}
   \end{frame}}
 """
+)
 
 
 def beamer_theme(release=None):

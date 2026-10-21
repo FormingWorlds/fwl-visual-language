@@ -17,6 +17,7 @@ The tokens start from [formingworlds.space](https://www.formingworlds.space): th
 | `jupyterbook/fwl-jupyterbook.css` | Jupyter Book 1 (sphinx-book-theme), light and dark | `python -m fwl_visual_language.jupyterbook book/_static` |
 | `latex/fwl.sty` | colours and fonts for letters, proposals and the CV with LuaLaTeX or XeLaTeX; `\usepackage[math]{fwl}` (or `\fwlusemath` in the preamble) adds the Inter and STIX Two math, with Inter SemiBold for bold math (figures and web pages keep Inter Medium); there `\bm` and `\boldsymbol` make a symbol bold in its own slant, italic for letters and small Greek, upright for digits and capital Greek, with or without the `bm` package, and math in headings reaches the PDF bookmarks | `python -m fwl_visual_language.latex path/to/document` |
 | `latex/fwlproposal.sty` | page style of proposals and reports: A4 with 2 cm margins, numbered headings, captions, links, footer (`\fwltitle{title}{subtitle}`, `\renewcommand{\fwlfooter}{...}`); loads `fwl` with `math` | same command |
+| `latex/fwlthesis.cls` | BSc and MSc theses: title page with the university banner, a section per page, grey guidance that the `final` option hides (see Theses) | `python -m fwl_visual_language.thesis path/to/thesis --example` |
 | `beamer/beamerthemefwl.sty` | LaTeX talks (`\usetheme{fwl}`), LuaLaTeX and BibTeX | `python -m fwl_visual_language.beamer path/to/talk` |
 
 The install commands copy the fonts and their licences next to the stylesheet or package. The Documenter.jl and Jupyter Book themes keep the stock layouts and change only colours and type. For Documenter.jl, add `"assets/fwl.css"` to `Documenter.HTML(; assets=[...])`; Jupyter Book 1 picks up every stylesheet in `_static` by itself.
@@ -93,6 +94,19 @@ A poster carries a header with the title, the authors, the affiliation and the l
 ```
 
 A statement may push its figures down. A title block, a reference or a contact line that does not fit its space stops the run with an error that names it, so a poster never goes out with text over a figure; the PowerPoint builder applies the same rules. `templates/` holds the PowerPoint posters, one file per format with a dark and a light slide; edit the slide of your look, delete the other, and replace each placeholder figure with your own.
+
+## Theses
+
+```bash
+python -m fwl_visual_language.thesis path/to/thesis --example   # class, fonts, logos and the example thesis
+python -m fwl_visual_language.thesis "Forming Worlds Thesis.zip" --zip
+```
+
+`fwlthesis.cls` is the class for BSc and MSc theses of the lab, compiled with LuaLaTeX. The title page carries the banner of the University of Groningen, the Faculty of Science and Engineering and the Kapteyn Astronomical Institute in ink, the degree line, the title, the author with the student number, the supervisors and the lab logo. Text is Geist at 11 pt on A4, math is the lab math, citations are author-year (natbib with the AAS style: `\citet` gives Lichtenberg et al. (2021), `\citep` gives (Lichtenberg et al. 2021)), and `siunitx` sets numbers with units. Every section opens a new page; numbered sections open under a large signal-blue number.
+
+The example thesis holds the order of a lab thesis: a page of tips, the abstract in 5 labelled parts and its Dutch version (Samenvatting), the contents, the numbered sections from Introduction to Conclusions, the required Data and code availability, the Acknowledgments and the references. Grey text from `\guide{...}` says what goes in each part; the class option `final` (`\documentclass[final]{fwlthesis}`) hides all of it, so it can stay in the source while the student writes. All code and data of a thesis are public, and every figure can be plotted again from them: `\figuredata{link}` names the data and the script of a figure in its caption, and the example plots its Figure 1 with `scripts/plot_cooling.py` from `data/cooling.csv` in the lab style (fwl-mpl).
+
+`templates/Forming Worlds Thesis.zip` is the example with the class, fonts and logos, with `main.tex` at its root, so Overleaf opens it as a new project from an uploaded zip; set the project's compiler to LuaLaTeX. Locally, `latexmk` takes LuaLaTeX from the `latexmkrc` in the example.
 
 ## Social media
 

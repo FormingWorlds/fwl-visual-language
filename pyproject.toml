@@ -38,7 +38,7 @@ version = { attr = "fwl_visual_language.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-fwl_visual_language = ["tokens/*.json", "fonts/*.txt", "fonts/ttf/*", "fonts/otf/*", "fonts/woff2/*", "assets/*"]
+fwl_visual_language = ["tokens/*.json", "fonts/*.txt", "fonts/ttf/*", "fonts/otf/*", "fonts/woff2/*", "assets/*", "thesis_example/*", "thesis_example/*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

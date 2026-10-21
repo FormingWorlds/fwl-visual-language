@@ -1,0 +1,2 @@
+# latexmk: compile with LuaLaTeX
+$pdf_mode = 4;
