@@ -10,7 +10,8 @@ of the letter, compiled with LuaLaTeX in Geist. ``letter`` has the lab logo and
 the sender block on its first page and the lab line in the footer.
 ``university`` has the banner of the University of Groningen, the Faculty of
 Science and Engineering and the Kapteyn Astronomical Institute in ink with the
-sender line under it, and the lab logo with the address in the footer. Without
+sender line under it, and the lab logo with the address and website in the
+footer. Without
 a name, the files carry the placeholders of the Word letters, so each member
 can write their own::
 
@@ -216,7 +217,8 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         "\\documentclass{article}\n"
         "\\usepackage[a4paper,margin=0pt]{geometry}\n"
         "\\usepackage{fontspec,xcolor,tikz,graphicx}\n"
-        "\\setmainfont{Geist}[Path=./,UprightFont=Geist-Regular.ttf,BoldFont=Geist-Medium.ttf]\n"
+        "\\setmainfont{Geist}[Path=./,UprightFont=Geist-Regular.ttf,BoldFont=Geist-Medium.ttf,"
+        "Ligatures=TeXOff]\n"  # -- and ' print as typed
         "\\pdfvariable suppressoptionalinfo 767\n"  # no dates or ID: same input, same PDF
         "\\tracinglostchars=3\n"  # a character without a glyph in Geist stops the run
         f"{colours}"
@@ -277,14 +279,16 @@ def build_letterhead(out, kind, name=NAME, role=ROLE, email=EMAIL):
                 ["lualatex", "-interaction=nonstopmode", "-halt-on-error", "letterhead.tex"],
                 cwd=tmp,
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
                 errors="replace",
             )
             if run.returncode != 0:
-                lost = re.findall(r"There is no (.+?) \((U\+[0-9A-F]+)\)", run.stdout)
-                if lost:
-                    chars = ", ".join(dict.fromkeys(f"{c} ({u})" for c, u in lost))
-                    raise RuntimeError(f"Geist has no glyph for {chars}; write the text without it")
+                lost = re.search(r"There is no (.+?) \((U\+[0-9A-Fa-f]+)\)", run.stdout)
+                if lost:  # TeX stops at the first one
+                    char, code = lost.groups()
+                    raise RuntimeError(
+                        f"Geist has no glyph for {char} ({code}); write the text without it"
+                    )
                 errors = [ln for ln in run.stdout.splitlines() if ln.startswith("!")]
                 detail = " ".join(errors) or run.stdout[-500:]
                 raise RuntimeError(f"lualatex failed for {kind}: {detail}")
@@ -339,7 +343,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         paths = build_stationery(args.folder, args.name, args.role, args.email)
-    except (ValueError, RuntimeError) as err:
+    except (ValueError, RuntimeError, OSError) as err:
         parser.error(str(err))
     for path in paths:
         print(path)

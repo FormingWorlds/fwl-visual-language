@@ -189,13 +189,14 @@ def test_the_letterheads_embed_only_geist_and_draw_the_rule_in_signal_blue(built
     )
     signal = tuple(int(ramp("signal")["500"][i : i + 2], 16) for i in (1, 3, 5))
 
-    def near(a, b):
-        return sum(abs(x - y) for x, y in zip(a, b, strict=True)) < 4
+    def blend(c):  # the share of signal blue in a pixel over white, or None for another colour
+        share = (255 - c[1]) / (255 - signal[1])
+        mix = [255 - share * (255 - s) for s in signal]
+        return share if all(abs(m - x) <= 6 for m, x in zip(mix, c, strict=True)) else None
 
-    rule = sum(n for c, n in colours.items() if near(c, signal))
-    assert 2 <= rule <= 5  # 0.8 pt is 3.3 px at 300 dpi
-    # only white and the blue of the rule and its edges, no other ink
-    assert all(c == (255, 255, 255) or abs(c[0] - c[2]) > 60 for c in colours)
+    shares = [blend(c) for c in colours.elements()]
+    assert None not in shares  # only white, the blue and its edges over white
+    assert 2.8 <= sum(shares) <= 3.9  # 0.8 pt is 3.3 px at 300 dpi
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -212,7 +213,7 @@ def test_the_same_sender_gives_the_same_bytes_and_the_committed_files_match(buil
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
 def test_tex_characters_in_the_sender_compile_and_print_as_typed(tmp_path):
-    role = "[Visiting] *x 50% #1 $ {y} ~ ^ \\"
+    role = "[Visiting] *x 50% #1 $ {y} ~ ^ \\ -- 'q' ``r''"
     pdf = stationery.build_letterhead(
         tmp_path / "x.pdf", "letter", "Ana & Bo_C", role, "a_b@rug.nl"
     )
@@ -232,16 +233,16 @@ def test_a_character_without_a_glyph_in_geist_stops_the_build(tmp_path):
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
-def test_a_sender_just_inside_its_room_compiles(tmp_path):
-    role = "Postdoctoral researcher in planetary interiors"
-    pdf = stationery.build_letterhead(
-        tmp_path / "x.pdf", "university", "Firstname Lastname", role, "f.lastname@rug.nl"
-    )
-    assert _pages(pdf)[0].startswith(f"Firstname Lastname · {role}, Forming Worlds Lab ·")
-    pdf = stationery.build_letterhead(
-        tmp_path / "y.pdf", "letter", "N", role + " and atmospheres", "n@rug.nl"
-    )
-    assert f"{role} and atmospheres, Forming Worlds Lab" in _pages(pdf)[0]
+@pytest.mark.parametrize(
+    "kind, name, email",
+    [("letter", "N", "n@rug.nl"), ("university", "Firstname Lastname", "n@rug.nl")],
+)
+def test_the_room_ends_within_1_word_of_the_longest_sender_that_fits(tmp_path, kind, name, email):
+    role = "Postdoctoral researcher in planetary interiors and atmospheres of"
+    pdf = stationery.build_letterhead(tmp_path / "x.pdf", kind, name, role, email)
+    assert f"{role}, Forming Worlds Lab" in _pages(pdf)[0]
+    with pytest.raises(RuntimeError, match="sender text is wider than"):
+        stationery.build_letterhead(tmp_path / "y.pdf", kind, name, role + " rocky", email)
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -254,3 +255,4 @@ def test_a_sender_wider_than_its_room_stops_the_build(tmp_path, capsys, kind, ro
     with pytest.raises(SystemExit) as err:
         stationery.main([str(tmp_path / "cli"), "--role", role])
     assert err.value.code == 2 and "wider than" in capsys.readouterr().err
+    assert not (tmp_path / "cli").exists()

@@ -99,6 +99,6 @@ jobs:
             tests/test_stationery.py::test_tex_characters_in_the_sender_compile_and_print_as_typed \
             tests/test_stationery.py::test_a_sender_wider_than_its_room_stops_the_build \
             tests/test_stationery.py::test_a_character_without_a_glyph_in_geist_stops_the_build \
-            tests/test_stationery.py::test_a_sender_just_inside_its_room_compiles | tee out.txt
-          grep -qE "(^|[^0-9])41 passed" out.txt
+            tests/test_stationery.py::test_the_room_ends_within_1_word_of_the_longest_sender_that_fits | tee out.txt
+          grep -qE "(^|[^0-9])42 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi
