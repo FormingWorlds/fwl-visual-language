@@ -119,6 +119,16 @@ def test_a_failed_build_leaves_the_folder_as_it_was(monkeypatch, tmp_path):
     assert not (tmp_path / "missing").exists()
 
 
+def test_the_command_line_reports_a_folder_it_cannot_write(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(stationery, "build_letterhead", lambda out, *a: Path(out).write_bytes(b""))
+    blocker = tmp_path / "file"
+    blocker.write_text("not a folder")
+    with pytest.raises(SystemExit) as err:
+        stationery.main([str(blocker)])
+    assert err.value.code == 2 and "File exists" in capsys.readouterr().err
+    assert blocker.read_text() == "not a folder"
+
+
 def test_the_command_line_refuses_an_empty_name(tmp_path, capsys):
     with pytest.raises(SystemExit) as err:
         stationery.main([str(tmp_path / "out"), "--name", " "])
