@@ -10,8 +10,8 @@ of the letter, compiled with LuaLaTeX in Geist. ``letter`` has the lab logo and
 the sender block on its first page and the lab line in the footer.
 ``university`` has the banner of the University of Groningen, the Faculty of
 Science and Engineering and the Kapteyn Astronomical Institute in ink with the
-sender line under it, and the lab logo with the website beside it in the
-footer, with the address on the first page. Without a name, the files carry
+sender line under it, and the lab logo with the website beside it, as a link,
+in the footer, with the address on the first page. Without a name, the files carry
 the placeholders of the Word letters, so each member can write their own::
 
     python -m fwl_visual_language.stationery out --name "Firstname Lastname" \\
@@ -180,6 +180,7 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
     sep = "\\enspace\\textperiodcentered\\enspace "
     pos = "remember picture,overlay,x=1mm,y=1mm,shift={(current page.north west)}"
     small = "font=\\fontsize{7.5}{9}\\selectfont\\color{fwlfoot}"
+    links = ""
     if kind == "letter":
         sender = (
             f"\\begin{{tabular}}{{@{{}}r@{{}}}}{{\\bfseries\\color{{fwlink}}{name}}}\\\\"
@@ -200,6 +201,8 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         )
     else:
         sender = f"{{\\bfseries\\color{{fwlink}}{name}}}{sep}{role}, {INSTITUTE}{sep}{email}"
+        links = "\\usepackage[hidelinks]{hyperref}\n"
+        # the website sits on the baseline of the logo's lower word, 3 mm right of the logo
         logo = (
             "\\node[anchor=south west,inner sep=0] at (25,-284)"
             " {\\includegraphics[width=20mm]{fwl-logo-ink.png}};\n"
@@ -221,7 +224,7 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         "\\documentclass{article}\n"
         "\\usepackage[a4paper,margin=0pt]{geometry}\n"
         "\\usepackage{fontspec,xcolor,tikz,graphicx}\n"
-        "\\usepackage[hidelinks]{hyperref}\n"
+        f"{links}"
         "\\setmainfont{Geist}[Path=./,UprightFont=Geist-Regular.ttf,BoldFont=Geist-Medium.ttf,"
         "Ligatures=TeXOff]\n"  # -- and ' print as typed
         "\\pdfvariable suppressoptionalinfo 767\n"  # no dates or ID: same input, same PDF
@@ -347,7 +350,11 @@ def main(argv=None):
     )
     parser.add_argument("folder", help="output folder")
     parser.add_argument("--name", default=NAME, help=f"full name (default: {NAME})")
-    parser.add_argument("--role", default=ROLE, help=f"role in the lab (default: {ROLE})")
+    parser.add_argument(
+        "--role",
+        default=ROLE,
+        help=f"role in the lab, also on the university letterhead (default: {ROLE})",
+    )
     parser.add_argument("--email", default=EMAIL, help=f"email address (default: {EMAIL})")
     parser.add_argument(
         "--university-role", help="role on the university letterhead (default: the --role)"

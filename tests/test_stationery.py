@@ -16,6 +16,7 @@ from fwl_visual_language import ramp, stationery
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 TEX = all(shutil.which(t) for t in ("lualatex", "pdftotext", "pdffonts", "pdfinfo", "pdftoppm"))
 TIM = ("Tim Lichtenberg", "Group Leader", "tim.lichtenberg@rug.nl")
+TIM_UNIVERSITY = "Assistant Professor"
 LAB_LINE = "Forming Worlds Lab · Kapteyn Astronomical Institute · University of Groningen"
 
 
@@ -180,7 +181,10 @@ def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("stationery")
     stationery.main([str(root / "generic")])
     name, role, email = TIM
-    stationery.main([str(root / "tim"), "--name", name, "--role", role, "--email", email])
+    stationery.main(
+        [str(root / "tim"), "--name", name, "--role", role, "--email", email]
+        + ["--university-role", TIM_UNIVERSITY]
+    )
     return root
 
 
@@ -197,7 +201,8 @@ def test_each_letterhead_has_2_a4_pages_with_the_sender_and_footers(built):
         f"{LAB_LINE} 2",
     ]
     assert _pages(university) == [
-        "Tim Lichtenberg · Group Leader, Kapteyn Astronomical Institute · tim.lichtenberg@rug.nl "
+        "Tim Lichtenberg · Assistant Professor, Kapteyn Astronomical Institute · "
+        "tim.lichtenberg@rug.nl "
         "Landleven 12, 9747 AD Groningen formingworlds.space",
         "2 formingworlds.space",
     ]
@@ -205,13 +210,19 @@ def test_each_letterhead_has_2_a4_pages_with_the_sender_and_footers(built):
     assert generic.startswith("Name Surname · Role, Kapteyn Astronomical Institute · name@rug.nl")
 
 
+def _links(pdf):
+    urls = subprocess.run(["pdfinfo", "-url", str(pdf)], capture_output=True, text=True)
+    assert urls.returncode == 0, urls.stderr
+    return re.findall(r"^\s*(\d+)\s+Annotation\s+(\S+)\s*$", urls.stdout, re.M)
+
+
 @pytest.mark.skipif(not TEX, reason="no TeX")
-def test_the_university_letterhead_links_the_website_on_each_page(built):
-    for kind, rows in (("letter", []), ("university", ["1", "2"])):
-        pdf = built / "tim" / stationery.letterhead_name(kind)
-        urls = subprocess.run(["pdfinfo", "-url", str(pdf)], capture_output=True, text=True)
-        found = [ln.split() for ln in urls.stdout.splitlines()[1:]]
-        assert found == [[p, "Annotation", "https://formingworlds.space"] for p in rows], kind
+def test_only_the_university_letterhead_links_the_website_on_each_page(built):
+    web = "https://formingworlds.space"
+    name = stationery.letterhead_name("university")
+    for pdf in (built / "tim" / name, built / "generic" / name, TEMPLATES / name):
+        assert _links(pdf) == [("1", web), ("2", web)], pdf
+    assert _links(built / "tim" / stationery.letterhead_name("letter")) == []
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -247,8 +258,9 @@ def test_the_letterheads_embed_only_geist_and_draw_the_rule_in_signal_blue(built
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
 def test_the_same_sender_gives_the_same_bytes_and_the_committed_files_match(built, tmp_path):
-    again = stationery.build_letterhead(tmp_path / "a.pdf", "letter", *TIM)
-    assert again.read_bytes() == (built / "tim" / stationery.letterhead_name("letter")).read_bytes()
+    for kind, role in (("letter", TIM[1]), ("university", TIM_UNIVERSITY)):
+        again = stationery.build_letterhead(tmp_path / f"{kind}.pdf", kind, TIM[0], role, TIM[2])
+        assert again.read_bytes() == (built / "tim" / stationery.letterhead_name(kind)).read_bytes()
     assert (
         built / "generic" / stationery.SIGNATURE_NAME
     ).read_text() == stationery.signature_html()
