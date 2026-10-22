@@ -132,7 +132,7 @@ The example thesis holds the order of a lab thesis: tips on citations, code and 
 python -m fwl_visual_language.stationery out --name "Firstname Lastname" --role "PhD student" --email f.lastname@rug.nl
 ```
 
-The command writes an email signature and 2 letterhead PDFs for one person; without `--name`, `--role` and `--email` it writes the placeholders Name Surname, Role and name@rug.nl, as in `templates/`. The letterheads need LuaLaTeX.
+The command writes an email signature and 2 letterhead PDFs for one person; without `--name`, `--role` and `--email` it writes the placeholders Name Surname, Role and name@rug.nl, as in `templates/`. `--university-role` sets another role for the university letterhead, for example `--role "Group Leader" --university-role "Assistant Professor"`. The letterheads need LuaLaTeX.
 
 `Forming Worlds Signature.html` is one line: the name in ink, Forming Worlds Lab as a link in signal blue, then the institute and the university in grey. Mail clients do not load Geist, so the signature is set in Helvetica Neue, Helvetica or Arial, and it has no image for a client to block. Open the file in a browser, select the line, copy it and paste it into the signature settings of the mail program.
 

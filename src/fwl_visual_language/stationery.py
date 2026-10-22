@@ -16,6 +16,8 @@ the placeholders of the Word letters, so each member can write their own::
 
     python -m fwl_visual_language.stationery out --name "Firstname Lastname" \\
         --role "PhD student" --email f.lastname@rug.nl
+
+``--university-role`` sets another role for the university letterhead.
 """
 
 import argparse
@@ -299,7 +301,7 @@ def build_letterhead(out, kind, name=NAME, role=ROLE, email=EMAIL):
     return out
 
 
-def build_stationery(folder, name=NAME, role=ROLE, email=EMAIL):
+def build_stationery(folder, name=NAME, role=ROLE, email=EMAIL, university_role=None):
     """Write the signature and both letterheads of one person into a folder.
 
     Parameters
@@ -308,6 +310,9 @@ def build_stationery(folder, name=NAME, role=ROLE, email=EMAIL):
         Output folder; created if needed.
     name, role, email : str, optional
         Sender, as in :func:`letterhead_tex`; the placeholders by default.
+    university_role : str, optional
+        Role on the university letterhead, for a person whose position at the
+        institute differs from the role in the lab; ``role`` by default.
 
     Returns
     -------
@@ -325,8 +330,9 @@ def build_stationery(folder, name=NAME, role=ROLE, email=EMAIL):
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         (tmp / SIGNATURE_NAME).write_text(signature_html(name), encoding="ascii")
+        roles = {"letter": role, "university": role if university_role is None else university_role}
         for kind in KINDS:
-            build_letterhead(tmp / letterhead_name(kind), kind, name, role, email)
+            build_letterhead(tmp / letterhead_name(kind), kind, name, roles[kind], email)
         folder.mkdir(parents=True, exist_ok=True)
         for file in names:
             shutil.copyfile(tmp / file, folder / file)
@@ -343,9 +349,14 @@ def main(argv=None):
     parser.add_argument("--name", default=NAME, help=f"full name (default: {NAME})")
     parser.add_argument("--role", default=ROLE, help=f"role in the lab (default: {ROLE})")
     parser.add_argument("--email", default=EMAIL, help=f"email address (default: {EMAIL})")
+    parser.add_argument(
+        "--university-role", help="role on the university letterhead (default: the --role)"
+    )
     args = parser.parse_args(argv)
     try:
-        paths = build_stationery(args.folder, args.name, args.role, args.email)
+        paths = build_stationery(
+            args.folder, args.name, args.role, args.email, args.university_role
+        )
     except (ValueError, RuntimeError, OSError) as err:
         parser.error(str(err))
     for path in paths:

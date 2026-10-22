@@ -158,6 +158,22 @@ def _pages(pdf):
     return [re.sub(r"\s+", " ", p).strip() for p in text.stdout.split("\f")][:-1]
 
 
+@pytest.mark.parametrize(
+    "extra, roles",
+    [([], ["Lead", "Lead"]), (["--university-role", "Professor"], ["Lead", "Professor"])],
+)
+def test_the_university_letterhead_can_take_its_own_role(monkeypatch, tmp_path, extra, roles):
+    seen = []
+
+    def record(out, kind, name, role, email):
+        seen.append(role)
+        Path(out).write_bytes(b"%PDF")
+
+    monkeypatch.setattr(stationery, "build_letterhead", record)
+    stationery.main([str(tmp_path / "out"), "--role", "Lead", *extra])
+    assert seen == roles
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     """The placeholder set and my own set, each built by the command line."""
