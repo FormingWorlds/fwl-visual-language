@@ -107,7 +107,7 @@ def signature_html(name=NAME):
         f'<p style="margin:0;font-family:{MAIL_FONT};font-size:12px;line-height:1.5;'
         f'color:{ink["600"]}">'
         f'<span style="color:{ink["900"]};font-weight:600">{name}</span>{dot}'
-        f'<a href="https://{WEB}" style="color:{signal["600"]};text-decoration:none">'
+        f'<a href="https://{WEB}" style="color:{signal["500"]};text-decoration:none">'
         f"Forming Worlds Lab</a>{dot}{INSTITUTE}{dot}{UNIVERSITY}</p>\n"
     )
 

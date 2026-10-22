@@ -29,7 +29,7 @@ def test_the_signature_is_one_line_of_text_in_the_lab_colours():
         f'<span style="color:{ramp("ink")["900"]};font-weight:600">Tim Lichtenberg</span>' in text
     )
     assert (
-        f'<a href="https://formingworlds.space" style="color:{ramp("signal")["600"]};'
+        f'<a href="https://formingworlds.space" style="color:{ramp("signal")["500"]};'
         'text-decoration:none">Forming Worlds Lab</a>'
     ) in text
     plain = re.sub(r"<[^>]+>", "", text).replace("&middot;", "·").strip()
