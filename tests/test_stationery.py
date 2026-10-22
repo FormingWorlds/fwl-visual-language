@@ -38,6 +38,8 @@ def test_the_signature_escapes_the_name_and_has_a_placeholder():
     assert ">Name Surname</span>" in stationery.signature_html()
     text = stationery.signature_html(" A <b> & 'C' ")
     assert ">A &lt;b&gt; &amp; &#x27;C&#x27;</span>" in text
+    text = stationery.signature_html("Zoë Łukasz")
+    assert ">Zo&#235; &#321;ukasz</span>" in text and text.isascii()
 
 
 @pytest.mark.parametrize("bad", ["", "   ", "two\nlines", "cr\r", None, 3])
@@ -66,6 +68,9 @@ def test_the_source_escapes_tex_characters_and_checks_the_room():
     text = stationery.letterhead_tex("letter", "A & B_C", "50% {x} #1 $ ~ ^ \\", "a_b@rug.nl")
     assert "A \\& B\\_C" in text and "a\\_b@rug.nl" in text
     assert "50\\% \\{x\\} \\#1 \\$ \\textasciitilde{} \\textasciicircum{} \\textbackslash{}" in text
+    assert "\\\\{[}Visiting{]} {*}Guest, Forming" in stationery.letterhead_tex(
+        "letter", role="[Visiting] *Guest"
+    )
     assert "\\ifdim\\wd\\fwlsender>118mm" in text
     assert "\\ifdim\\wd\\fwlsender>160mm" in stationery.letterhead_tex("university")
     for kind, logo, banner in (("letter", 1, 0), ("university", 2, 1)):
@@ -88,6 +93,30 @@ def test_a_failed_compile_without_a_tex_error_line_reports_the_log_end(monkeypat
     monkeypatch.setattr(stationery.subprocess, "run", lambda *a, **k: done)
     with pytest.raises(RuntimeError, match="lualatex failed for university: early\nno error"):
         stationery.build_letterhead(tmp_path / "x.pdf", "university")
+
+
+def test_a_failed_build_leaves_the_folder_as_it_was(monkeypatch, tmp_path):
+    folder = tmp_path / "out"
+    folder.mkdir()
+    (folder / stationery.SIGNATURE_NAME).write_text("old")
+    calls = []
+
+    def fail_second(out, kind, *sender):
+        calls.append(kind)
+        if kind == "university":
+            raise RuntimeError("no room")
+        Path(out).write_bytes(b"%PDF")
+
+    monkeypatch.setattr(stationery, "build_letterhead", fail_second)
+    with pytest.raises(RuntimeError, match="no room"):
+        stationery.build_stationery(folder, "New Name")
+    assert calls == ["letter", "university"]
+    assert sorted(p.name for p in folder.iterdir()) == [stationery.SIGNATURE_NAME]
+    assert (folder / stationery.SIGNATURE_NAME).read_text() == "old"
+    assert not (tmp_path / "missing").exists()
+    with pytest.raises(RuntimeError):
+        stationery.build_stationery(tmp_path / "missing")
+    assert not (tmp_path / "missing").exists()
 
 
 def test_the_command_line_refuses_an_empty_name(tmp_path, capsys):
@@ -159,7 +188,14 @@ def test_the_letterheads_embed_only_geist_and_draw_the_rule_in_signal_blue(built
         image.getpixel((int(100 * mm), int(y))) for y in range(int(43 * mm), int(47 * mm))
     )
     signal = tuple(int(ramp("signal")["500"][i : i + 2], 16) for i in (1, 3, 5))
-    assert colours[signal] >= 3 and set(colours) == {signal, (255, 255, 255)}
+
+    def near(a, b):
+        return sum(abs(x - y) for x, y in zip(a, b, strict=True)) < 4
+
+    rule = sum(n for c, n in colours.items() if near(c, signal))
+    assert 2 <= rule <= 5  # 0.8 pt is 3.3 px at 300 dpi
+    # only white and the blue of the rule and its edges, no other ink
+    assert all(c == (255, 255, 255) or abs(c[0] - c[2]) > 60 for c in colours)
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -176,11 +212,36 @@ def test_the_same_sender_gives_the_same_bytes_and_the_committed_files_match(buil
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
 def test_tex_characters_in_the_sender_compile_and_print_as_typed(tmp_path):
+    role = "[Visiting] *x 50% #1 $ {y} ~ ^ \\"
     pdf = stationery.build_letterhead(
-        tmp_path / "x.pdf", "letter", "Ana & Bo_C", "50% #1", "a_b@rug.nl"
+        tmp_path / "x.pdf", "letter", "Ana & Bo_C", role, "a_b@rug.nl"
     )
-    assert _pages(pdf)[0].startswith("Ana & Bo_C 50% #1, Forming Worlds Lab ")
+    assert _pages(pdf)[0].startswith(f"Ana & Bo_C {role}, Forming Worlds Lab ")
     assert "a_b@rug.nl · formingworlds.space" in _pages(pdf)[0]
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_a_character_without_a_glyph_in_geist_stops_the_build(tmp_path):
+    with pytest.raises(RuntimeError, match=r"Geist has no glyph for Ε \(U\+0395\); write"):
+        stationery.build_letterhead(tmp_path / "x.pdf", "letter", "Ελλάς", "Role", "n@rug.nl")
+    assert not (tmp_path / "x.pdf").exists()
+    pdf = stationery.build_letterhead(
+        tmp_path / "y.pdf", "letter", "Zoë Ångström", "Role", "n@rug.nl"
+    )
+    assert _pages(pdf)[0].startswith("Zoë Ångström Role, Forming Worlds Lab ")
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_a_sender_just_inside_its_room_compiles(tmp_path):
+    role = "Postdoctoral researcher in planetary interiors"
+    pdf = stationery.build_letterhead(
+        tmp_path / "x.pdf", "university", "Firstname Lastname", role, "f.lastname@rug.nl"
+    )
+    assert _pages(pdf)[0].startswith(f"Firstname Lastname · {role}, Forming Worlds Lab ·")
+    pdf = stationery.build_letterhead(
+        tmp_path / "y.pdf", "letter", "N", role + " and atmospheres", "n@rug.nl"
+    )
+    assert f"{role} and atmospheres, Forming Worlds Lab" in _pages(pdf)[0]
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")

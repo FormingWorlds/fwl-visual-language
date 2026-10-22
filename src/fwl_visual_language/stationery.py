@@ -7,12 +7,12 @@ image that a client could block.
 
 The letterheads are A4 PDFs with 2 pages, a first page and a page for the rest
 of the letter, compiled with LuaLaTeX in Geist. ``letter`` has the lab logo and
-the sender block on its first page and the lab line in the footer, as the Word
-letter. ``university`` has the banner of the University of Groningen, the
-Faculty of Science and Engineering and the Kapteyn Astronomical Institute with
-the sender line under it, and the lab logo in the footer, as the Word
-university letter. Without a name, the files carry the placeholders of the Word
-letters, so each member can write their own::
+the sender block on its first page and the lab line in the footer.
+``university`` has the banner of the University of Groningen, the Faculty of
+Science and Engineering and the Kapteyn Astronomical Institute in ink with the
+sender line under it, and the lab logo with the address in the footer. Without
+a name, the files carry the placeholders of the Word letters, so each member
+can write their own::
 
     python -m fwl_visual_language.stationery out --name "Firstname Lastname" \\
         --role "PhD student" --email f.lastname@rug.nl
@@ -20,7 +20,7 @@ letters, so each member can write their own::
 
 import argparse
 import html
-import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -48,8 +48,6 @@ _FONTS = ("Geist-Regular.ttf", "Geist-Medium.ttf")
 _LOGOS = ("fwl-logo-ink.png", "rug-banner-ink.png")
 # room for the sender block beside the logo, and for the sender line under the banner
 _ROOM = {"letter": "118mm", "university": "160mm"}
-# a fixed date makes the same input give the same PDF
-_EPOCH = "1767225600"
 _TEX_CHARS = {
     "\\": r"\textbackslash{}",
     "&": r"\&",
@@ -61,6 +59,10 @@ _TEX_CHARS = {
     "}": r"\}",
     "~": r"\textasciitilde{}",
     "^": r"\textasciicircum{}",
+    # after a row break these would read as its options
+    "[": "{[}",
+    "]": "{]}",
+    "*": "{*}",
 }
 
 
@@ -96,12 +98,14 @@ def signature_html(name=NAME):
         If ``name`` is empty or holds a line break.
     """
     name = _check(name, ROLE, EMAIL)[0]
+    # character references keep the file ASCII, so no browser guesses its encoding
+    name = html.escape(name).encode("ascii", "xmlcharrefreplace").decode("ascii")
     ink, signal = ramp("ink"), ramp("signal")
     dot = " &middot; "
     return (
         f'<p style="margin:0;font-family:{MAIL_FONT};font-size:12px;line-height:1.5;'
         f'color:{ink["600"]}">'
-        f'<span style="color:{ink["900"]};font-weight:600">{html.escape(name)}</span>{dot}'
+        f'<span style="color:{ink["900"]};font-weight:600">{name}</span>{dot}'
         f'<a href="https://{WEB}" style="color:{signal["600"]};text-decoration:none">'
         f"Forming Worlds Lab</a>{dot}{INSTITUTE}{dot}{UNIVERSITY}</p>\n"
     )
@@ -213,7 +217,8 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         "\\usepackage[a4paper,margin=0pt]{geometry}\n"
         "\\usepackage{fontspec,xcolor,tikz,graphicx}\n"
         "\\setmainfont{Geist}[Path=./,UprightFont=Geist-Regular.ttf,BoldFont=Geist-Medium.ttf]\n"
-        "\\pdfvariable suppressoptionalinfo 767\n"
+        "\\pdfvariable suppressoptionalinfo 767\n"  # no dates or ID: same input, same PDF
+        "\\tracinglostchars=3\n"  # a character without a glyph in Geist stops the run
         f"{colours}"
         "\\pagestyle{empty}\\parindent=0pt\n"
         "\\newsavebox\\fwlsender\n"
@@ -250,7 +255,8 @@ def build_letterhead(out, kind, name=NAME, role=ROLE, email=EMAIL):
     ------
     RuntimeError
         If ``lualatex`` is not on the path, or the compile fails; the message
-        holds the TeX error, for example a sender text wider than its room.
+        names a character that Geist does not have, or holds the TeX error, for
+        example a sender text wider than its room.
     ValueError
         As :func:`letterhead_tex`.
     """
@@ -265,18 +271,20 @@ def build_letterhead(out, kind, name=NAME, role=ROLE, email=EMAIL):
         for file in _LOGOS:
             shutil.copyfile(assets_dir() / file, tmp / file)
         (tmp / "letterhead.tex").write_text(source, encoding="utf-8")
-        env = {**os.environ, "SOURCE_DATE_EPOCH": _EPOCH, "FORCE_SOURCE_DATE": "1"}
         # tikz places the page nodes from the .aux of the first pass
         for _ in range(2):
             run = subprocess.run(
                 ["lualatex", "-interaction=nonstopmode", "-halt-on-error", "letterhead.tex"],
                 cwd=tmp,
-                env=env,
                 capture_output=True,
                 text=True,
                 errors="replace",
             )
             if run.returncode != 0:
+                lost = re.findall(r"There is no (.+?) \((U\+[0-9A-F]+)\)", run.stdout)
+                if lost:
+                    chars = ", ".join(dict.fromkeys(f"{c} ({u})" for c, u in lost))
+                    raise RuntimeError(f"Geist has no glyph for {chars}; write the text without it")
                 errors = [ln for ln in run.stdout.splitlines() if ln.startswith("!")]
                 detail = " ".join(errors) or run.stdout[-500:]
                 raise RuntimeError(f"lualatex failed for {kind}: {detail}")
@@ -298,14 +306,24 @@ def build_stationery(folder, name=NAME, role=ROLE, email=EMAIL):
     -------
     list of pathlib.Path
         The signature, then the letter and the university letterhead.
+
+    Raises
+    ------
+    RuntimeError, ValueError
+        As :func:`build_letterhead`; the folder then stays as it was.
     """
     folder = Path(folder)
-    _check(name, role, email)
-    folder.mkdir(parents=True, exist_ok=True)
-    sig = folder / SIGNATURE_NAME
-    sig.write_text(signature_html(name), encoding="utf-8")
-    pdfs = [build_letterhead(folder / letterhead_name(k), k, name, role, email) for k in KINDS]
-    return [sig, *pdfs]
+    names = [SIGNATURE_NAME, *(letterhead_name(k) for k in KINDS)]
+    # build all 3 first, so a failure leaves the folder as it was
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        (tmp / SIGNATURE_NAME).write_text(signature_html(name), encoding="ascii")
+        for kind in KINDS:
+            build_letterhead(tmp / letterhead_name(kind), kind, name, role, email)
+        folder.mkdir(parents=True, exist_ok=True)
+        for file in names:
+            shutil.copyfile(tmp / file, folder / file)
+    return [folder / file for file in names]
 
 
 def main(argv=None):

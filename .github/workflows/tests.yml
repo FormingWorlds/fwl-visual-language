@@ -97,6 +97,8 @@ jobs:
             tests/test_stationery.py::test_the_letterheads_embed_only_geist_and_draw_the_rule_in_signal_blue \
             tests/test_stationery.py::test_the_same_sender_gives_the_same_bytes_and_the_committed_files_match \
             tests/test_stationery.py::test_tex_characters_in_the_sender_compile_and_print_as_typed \
-            tests/test_stationery.py::test_a_sender_wider_than_its_room_stops_the_build | tee out.txt
-          grep -qE "(^|[^0-9])39 passed" out.txt
+            tests/test_stationery.py::test_a_sender_wider_than_its_room_stops_the_build \
+            tests/test_stationery.py::test_a_character_without_a_glyph_in_geist_stops_the_build \
+            tests/test_stationery.py::test_a_sender_just_inside_its_room_compiles | tee out.txt
+          grep -qE "(^|[^0-9])41 passed" out.txt
           if grep -qE "[0-9]+ (skipped|failed|errors?)" out.txt; then exit 1; fi
