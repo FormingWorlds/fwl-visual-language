@@ -16,6 +16,7 @@ from fwl_visual_language import ramp, stationery
 TEMPLATES = Path(__file__).resolve().parents[1] / "templates"
 TEX = all(shutil.which(t) for t in ("lualatex", "pdftotext", "pdffonts", "pdfinfo", "pdftoppm"))
 TIM = ("Tim Lichtenberg", "Group Leader", "tim.lichtenberg@rug.nl")
+TIM_UNIVERSITY = "Assistant Professor"
 LAB_LINE = "Forming Worlds Lab · Kapteyn Astronomical Institute · University of Groningen"
 
 
@@ -80,6 +81,8 @@ def test_the_source_escapes_tex_characters_and_checks_the_room():
         assert source.count("fwl-logo-ink.png") == logo
         assert source.count("rug-banner-ink.png") == banner
         assert f"\\definecolor{{fwlsignal}}{{HTML}}{{{ramp('signal')['500'][1:]}}}" in source
+        assert source.count("\\href{https://formingworlds.space}") == 2 * banner
+        assert ("{hyperref}" in source) == bool(banner)
 
 
 def test_a_missing_lualatex_stops_with_a_clear_error(monkeypatch, tmp_path):
@@ -157,13 +160,32 @@ def _pages(pdf):
     return [re.sub(r"\s+", " ", p).strip() for p in text.stdout.split("\f")][:-1]
 
 
+@pytest.mark.parametrize(
+    "extra, roles",
+    [([], ["Lead", "Lead"]), (["--university-role", "Professor"], ["Lead", "Professor"])],
+)
+def test_the_university_letterhead_can_take_its_own_role(monkeypatch, tmp_path, extra, roles):
+    seen = []
+
+    def record(out, kind, name, role, email):
+        seen.append(role)
+        Path(out).write_bytes(b"%PDF")
+
+    monkeypatch.setattr(stationery, "build_letterhead", record)
+    stationery.main([str(tmp_path / "out"), "--role", "Lead", *extra])
+    assert seen == roles
+
+
 @pytest.fixture(scope="module")
 def built(tmp_path_factory):
     """The placeholder set and my own set, each built by the command line."""
     root = tmp_path_factory.mktemp("stationery")
     stationery.main([str(root / "generic")])
     name, role, email = TIM
-    stationery.main([str(root / "tim"), "--name", name, "--role", role, "--email", email])
+    stationery.main(
+        [str(root / "tim"), "--name", name, "--role", role, "--email", email]
+        + ["--university-role", TIM_UNIVERSITY]
+    )
     return root
 
 
@@ -180,12 +202,30 @@ def test_each_letterhead_has_2_a4_pages_with_the_sender_and_footers(built):
         f"{LAB_LINE} 2",
     ]
     assert _pages(university) == [
-        "Tim Lichtenberg · Group Leader, Forming Worlds Lab · tim.lichtenberg@rug.nl "
-        "Landleven 12, 9747 AD Groningen · formingworlds.space",
-        "2",
+        "Tim Lichtenberg · Assistant Professor, Kapteyn Astronomical Institute · "
+        "tim.lichtenberg@rug.nl "
+        "Landleven 12, 9747 AD Groningen formingworlds.space",
+        "2 formingworlds.space",
     ]
     generic = _pages(built / "generic" / stationery.letterhead_name("university"))[0]
-    assert generic.startswith("Name Surname · Role, Forming Worlds Lab · name@rug.nl")
+    assert generic.startswith("Name Surname · Role, Kapteyn Astronomical Institute · name@rug.nl")
+
+
+def _links(pdf):
+    urls = subprocess.run(["pdfinfo", "-url", str(pdf)], capture_output=True, text=True)
+    assert urls.returncode == 0, urls.stderr
+    return re.findall(r"^\s*(\d+)\s+Annotation\s+(\S+)\s*$", urls.stdout, re.M)
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_only_the_university_letterhead_links_the_website_on_each_page(built):
+    web = "https://formingworlds.space"
+    name = stationery.letterhead_name("university")
+    for pdf in (built / "tim" / name, built / "generic" / name, TEMPLATES / name):
+        assert _links(pdf) == [("1", web), ("2", web)], pdf
+    name = stationery.letterhead_name("letter")
+    for pdf in (built / "tim" / name, built / "generic" / name, TEMPLATES / name):
+        assert _links(pdf) == [], pdf
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -221,8 +261,9 @@ def test_the_letterheads_embed_only_geist_and_draw_the_rule_in_signal_blue(built
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
 def test_the_same_sender_gives_the_same_bytes_and_the_committed_files_match(built, tmp_path):
-    again = stationery.build_letterhead(tmp_path / "a.pdf", "letter", *TIM)
-    assert again.read_bytes() == (built / "tim" / stationery.letterhead_name("letter")).read_bytes()
+    for kind, role in (("letter", TIM[1]), ("university", TIM_UNIVERSITY)):
+        again = stationery.build_letterhead(tmp_path / f"{kind}.pdf", kind, TIM[0], role, TIM[2])
+        assert again.read_bytes() == (built / "tim" / stationery.letterhead_name(kind)).read_bytes()
     assert (
         built / "generic" / stationery.SIGNATURE_NAME
     ).read_text() == stationery.signature_html()
@@ -252,17 +293,27 @@ def test_a_character_without_a_glyph_in_geist_stops_the_build(tmp_path):
     assert _pages(pdf)[0].startswith("Zoë Ångström Role, Forming Worlds Lab ")
 
 
+ROOM_CASES = [
+    ("letter", "N", "Postdoctoral researcher in planetary interiors and atmospheres of", "rocky"),
+    (
+        "university",
+        "Firstname Lastname",
+        "Postdoctoral researcher in planetary interiors and",
+        "atmospheres",
+    ),
+]
+
+
 @pytest.mark.skipif(not TEX, reason="no TeX")
-@pytest.mark.parametrize(
-    "kind, name, email",
-    [("letter", "N", "n@rug.nl"), ("university", "Firstname Lastname", "n@rug.nl")],
-)
-def test_the_room_ends_within_1_word_of_the_longest_sender_that_fits(tmp_path, kind, name, email):
-    role = "Postdoctoral researcher in planetary interiors and atmospheres of"
-    pdf = stationery.build_letterhead(tmp_path / "x.pdf", kind, name, role, email)
-    assert f"{role}, Forming Worlds Lab" in _pages(pdf)[0]
+@pytest.mark.parametrize("kind, name, role, word", ROOM_CASES)
+def test_the_room_ends_within_1_word_of_the_longest_sender_that_fits(
+    tmp_path, kind, name, role, word
+):
+    pdf = stationery.build_letterhead(tmp_path / "x.pdf", kind, name, role, "n@rug.nl")
+    unit = "Forming Worlds Lab" if kind == "letter" else "Kapteyn Astronomical Institute"
+    assert f"{role}, {unit}" in _pages(pdf)[0]
     with pytest.raises(RuntimeError, match="sender text is wider than"):
-        stationery.build_letterhead(tmp_path / "y.pdf", kind, name, role + " rocky", email)
+        stationery.build_letterhead(tmp_path / "y.pdf", kind, name, f"{role} {word}", "n@rug.nl")
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
