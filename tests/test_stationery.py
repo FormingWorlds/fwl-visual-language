@@ -82,6 +82,7 @@ def test_the_source_escapes_tex_characters_and_checks_the_room():
         assert source.count("rug-banner-ink.png") == banner
         assert f"\\definecolor{{fwlsignal}}{{HTML}}{{{ramp('signal')['500'][1:]}}}" in source
         assert source.count("\\href{https://formingworlds.space}") == 2 * banner
+        assert ("{hyperref}" in source) == bool(banner)
 
 
 def test_a_missing_lualatex_stops_with_a_clear_error(monkeypatch, tmp_path):
@@ -222,7 +223,9 @@ def test_only_the_university_letterhead_links_the_website_on_each_page(built):
     name = stationery.letterhead_name("university")
     for pdf in (built / "tim" / name, built / "generic" / name, TEMPLATES / name):
         assert _links(pdf) == [("1", web), ("2", web)], pdf
-    assert _links(built / "tim" / stationery.letterhead_name("letter")) == []
+    name = stationery.letterhead_name("letter")
+    for pdf in (built / "tim" / name, built / "generic" / name, TEMPLATES / name):
+        assert _links(pdf) == [], pdf
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")

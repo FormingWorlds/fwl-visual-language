@@ -202,7 +202,7 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
     else:
         sender = f"{{\\bfseries\\color{{fwlink}}{name}}}{sep}{role}, {INSTITUTE}{sep}{email}"
         links = "\\usepackage[hidelinks]{hyperref}\n"
-        # the website sits on the baseline of the logo's lower word, 3 mm right of the logo
+        # the website, 3 mm right of the logo, ends level with its foot (placed by eye)
         logo = (
             "\\node[anchor=south west,inner sep=0] at (25,-284)"
             " {\\includegraphics[width=20mm]{fwl-logo-ink.png}};\n"
