@@ -1,8 +1,10 @@
 """Email signature and letterhead PDFs."""
 
 import re
+import runpy
 import shutil
 import subprocess
+import sys
 import types
 from collections import Counter
 from pathlib import Path
@@ -135,6 +137,14 @@ def test_the_command_line_refuses_an_empty_name(tmp_path, capsys):
     assert err.value.code == 2
     assert "name must be non-empty text" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
+
+
+def test_the_module_runs_as_a_script(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("sys.argv", ["stationery", str(tmp_path / "out"), "--email", ""])
+    monkeypatch.delitem(sys.modules, "fwl_visual_language.stationery")
+    with pytest.raises(SystemExit) as err:
+        runpy.run_module("fwl_visual_language.stationery", run_name="__main__")
+    assert err.value.code == 2 and "email must be non-empty text" in capsys.readouterr().err
 
 
 def test_the_committed_signature_matches_a_fresh_build():
