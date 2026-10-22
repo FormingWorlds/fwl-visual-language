@@ -126,6 +126,18 @@ The example thesis holds the order of a lab thesis: tips on citations, code and 
 
 `templates/Forming Worlds Thesis.zip` is the example with the class, fonts and logos, with `main.tex` at its root, so Overleaf opens it as a new project from an uploaded zip; set the project's compiler to LuaLaTeX. Locally, `latexmk` takes LuaLaTeX from the `latexmkrc` in the example.
 
+## Email signature and letterhead
+
+```bash
+python -m fwl_visual_language.stationery out --name "Firstname Lastname" --role "PhD student" --email f.lastname@rug.nl
+```
+
+The command writes an email signature and 2 letterhead PDFs for one person; without `--name`, `--role` and `--email` it writes the placeholders Name Surname, Role and name@rug.nl, as in `templates/`. The letterheads need LuaLaTeX.
+
+`Forming Worlds Signature.html` is one line: the name in ink, Forming Worlds Lab as a link in signal blue, then the institute and the university in grey. Mail clients do not load Geist, so the signature is set in Helvetica Neue, Helvetica or Arial, and it has no image for a client to block. Open the file in a browser, select the line, copy it and paste it into the signature settings of the mail program.
+
+`Forming Worlds Letterhead.pdf` has the lab logo and the sender block (name, role, institute, university, address, email and website) on its first page and the lab line in the footer, as the Word letter. `Forming Worlds University Letterhead.pdf` has the banner of the University of Groningen, the Faculty of Science and Engineering and the Kapteyn Astronomical Institute with the sender line under it, and the lab logo with the address in the footer, as the Word university letter. Each PDF is A4 with 2 pages, the first page and a page for the rest of the letter with its page number, in Geist; write on it in Preview or Acrobat. A sender text wider than its room (118 mm beside the logo, 160 mm under the banner) stops the build with an error, and the same sender always gives the same PDF.
+
 ## Social media
 
 ```bash
