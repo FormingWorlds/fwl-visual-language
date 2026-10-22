@@ -10,10 +10,9 @@ of the letter, compiled with LuaLaTeX in Geist. ``letter`` has the lab logo and
 the sender block on its first page and the lab line in the footer.
 ``university`` has the banner of the University of Groningen, the Faculty of
 Science and Engineering and the Kapteyn Astronomical Institute in ink with the
-sender line under it, and the lab logo with the address and website in the
-footer. Without
-a name, the files carry the placeholders of the Word letters, so each member
-can write their own::
+sender line under it, and the lab logo with the website beside it in the
+footer, with the address on the first page. Without a name, the files carry
+the placeholders of the Word letters, so each member can write their own::
 
     python -m fwl_visual_language.stationery out --name "Firstname Lastname" \\
         --role "PhD student" --email f.lastname@rug.nl
@@ -151,7 +150,8 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         ``letter`` or ``university``.
     name, role, email : str, optional
         Sender; the placeholders of the Word letters by default. The role is
-        followed by ``, Forming Worlds Lab``.
+        followed by ``, Forming Worlds Lab`` on the letter and by the
+        institute on the university letter.
 
     Returns
     -------
@@ -197,10 +197,12 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
             f" {{Forming Worlds Lab{sep}{INSTITUTE}{sep}{UNIVERSITY}}};\n"
         )
     else:
-        sender = f"{{\\bfseries\\color{{fwlink}}{name}}}{sep}{role}, Forming Worlds Lab{sep}{email}"
+        sender = f"{{\\bfseries\\color{{fwlink}}{name}}}{sep}{role}, {INSTITUTE}{sep}{email}"
         logo = (
             "\\node[anchor=south west,inner sep=0] at (25,-284)"
             " {\\includegraphics[width=20mm]{fwl-logo-ink.png}};\n"
+            "\\node[anchor=south west,inner sep=0,font=\\fontsize{9}{11}\\selectfont]"
+            f" at (48,-284.3) {{\\href{{https://{WEB}}}{{\\color{{fwlsignal}}{WEB}}}}};\n"
         )
         first = (
             "\\node[anchor=north west,inner sep=0] at (25,-15)"
@@ -208,7 +210,7 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
             "\\node[anchor=north east,inner sep=0] at (185,-35) {\\usebox\\fwlsender};\n"
             + logo
             + f"\\node[anchor=south east,inner sep=0,{small}] at (185,-282)"
-            f" {{{ADDRESS}{sep}{WEB}}};\n"
+            f" {{{ADDRESS}}};\n"
         )
         rest = logo
     rest += f"\\node[anchor=south east,inner sep=0,{small}] at (185,-282) {{2}};\n"
@@ -217,6 +219,7 @@ def letterhead_tex(kind, name=NAME, role=ROLE, email=EMAIL):
         "\\documentclass{article}\n"
         "\\usepackage[a4paper,margin=0pt]{geometry}\n"
         "\\usepackage{fontspec,xcolor,tikz,graphicx}\n"
+        "\\usepackage[hidelinks]{hyperref}\n"
         "\\setmainfont{Geist}[Path=./,UprightFont=Geist-Regular.ttf,BoldFont=Geist-Medium.ttf,"
         "Ligatures=TeXOff]\n"  # -- and ' print as typed
         "\\pdfvariable suppressoptionalinfo 767\n"  # no dates or ID: same input, same PDF

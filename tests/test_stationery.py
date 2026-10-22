@@ -80,6 +80,7 @@ def test_the_source_escapes_tex_characters_and_checks_the_room():
         assert source.count("fwl-logo-ink.png") == logo
         assert source.count("rug-banner-ink.png") == banner
         assert f"\\definecolor{{fwlsignal}}{{HTML}}{{{ramp('signal')['500'][1:]}}}" in source
+        assert source.count("\\href{https://formingworlds.space}") == 2 * banner
 
 
 def test_a_missing_lualatex_stops_with_a_clear_error(monkeypatch, tmp_path):
@@ -180,12 +181,21 @@ def test_each_letterhead_has_2_a4_pages_with_the_sender_and_footers(built):
         f"{LAB_LINE} 2",
     ]
     assert _pages(university) == [
-        "Tim Lichtenberg · Group Leader, Forming Worlds Lab · tim.lichtenberg@rug.nl "
-        "Landleven 12, 9747 AD Groningen · formingworlds.space",
-        "2",
+        "Tim Lichtenberg · Group Leader, Kapteyn Astronomical Institute · tim.lichtenberg@rug.nl "
+        "Landleven 12, 9747 AD Groningen formingworlds.space",
+        "2 formingworlds.space",
     ]
     generic = _pages(built / "generic" / stationery.letterhead_name("university"))[0]
-    assert generic.startswith("Name Surname · Role, Forming Worlds Lab · name@rug.nl")
+    assert generic.startswith("Name Surname · Role, Kapteyn Astronomical Institute · name@rug.nl")
+
+
+@pytest.mark.skipif(not TEX, reason="no TeX")
+def test_the_university_letterhead_links_the_website_on_each_page(built):
+    for kind, rows in (("letter", []), ("university", ["1", "2"])):
+        pdf = built / "tim" / stationery.letterhead_name(kind)
+        urls = subprocess.run(["pdfinfo", "-url", str(pdf)], capture_output=True, text=True)
+        found = [ln.split() for ln in urls.stdout.splitlines()[1:]]
+        assert found == [[p, "Annotation", "https://formingworlds.space"] for p in rows], kind
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
@@ -252,17 +262,27 @@ def test_a_character_without_a_glyph_in_geist_stops_the_build(tmp_path):
     assert _pages(pdf)[0].startswith("Zoë Ångström Role, Forming Worlds Lab ")
 
 
+ROOM_CASES = [
+    ("letter", "N", "Postdoctoral researcher in planetary interiors and atmospheres of", "rocky"),
+    (
+        "university",
+        "Firstname Lastname",
+        "Postdoctoral researcher in planetary interiors and",
+        "atmospheres",
+    ),
+]
+
+
 @pytest.mark.skipif(not TEX, reason="no TeX")
-@pytest.mark.parametrize(
-    "kind, name, email",
-    [("letter", "N", "n@rug.nl"), ("university", "Firstname Lastname", "n@rug.nl")],
-)
-def test_the_room_ends_within_1_word_of_the_longest_sender_that_fits(tmp_path, kind, name, email):
-    role = "Postdoctoral researcher in planetary interiors and atmospheres of"
-    pdf = stationery.build_letterhead(tmp_path / "x.pdf", kind, name, role, email)
-    assert f"{role}, Forming Worlds Lab" in _pages(pdf)[0]
+@pytest.mark.parametrize("kind, name, role, word", ROOM_CASES)
+def test_the_room_ends_within_1_word_of_the_longest_sender_that_fits(
+    tmp_path, kind, name, role, word
+):
+    pdf = stationery.build_letterhead(tmp_path / "x.pdf", kind, name, role, "n@rug.nl")
+    unit = "Forming Worlds Lab" if kind == "letter" else "Kapteyn Astronomical Institute"
+    assert f"{role}, {unit}" in _pages(pdf)[0]
     with pytest.raises(RuntimeError, match="sender text is wider than"):
-        stationery.build_letterhead(tmp_path / "y.pdf", kind, name, role + " rocky", email)
+        stationery.build_letterhead(tmp_path / "y.pdf", kind, name, f"{role} {word}", "n@rug.nl")
 
 
 @pytest.mark.skipif(not TEX, reason="no TeX")
